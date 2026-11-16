@@ -31,7 +31,8 @@ export const fetchColleagues = createAsyncThunk<Colleague[], string, { rejectVal
     try {
       const response = await axiosInstance.get(`/users/company/${userId}`);
       const data = response.data?.data;
-      return Array.isArray(data) ? data : [];
+      // Deleted users come back as null.
+      return Array.isArray(data) ? data.filter((u: any) => u && u._id) : [];
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || error.message || 'Failed to load colleagues');
     }

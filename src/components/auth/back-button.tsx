@@ -34,10 +34,10 @@ export function BackButton() {
         else router.replace('/(public)/login');
       }}
       onPressIn={() => {
-        pressed.value = withTiming(1, { duration: 90 });
+        pressed.set(withTiming(1, { duration: 90 }));
       }}
       onPressOut={() => {
-        pressed.value = withSpring(0, { damping: 12, stiffness: 220 });
+        pressed.set(withSpring(0, { damping: 12, stiffness: 220 }));
       }}
       accessibilityRole="button"
       accessibilityLabel="Go back"

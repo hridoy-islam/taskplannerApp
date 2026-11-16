@@ -34,7 +34,7 @@ const ICONS = {
   priority: { ios: 'flag.fill', android: 'flag', web: 'flag' },
   starOn: { ios: 'star.fill', android: 'star', web: 'star' },
   starOff: { ios: 'star', android: 'star_border', web: 'star_border' },
-  mail: { ios: 'envelope', android: 'mail', web: 'mail' },
+  chat: { ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' },
 } satisfies Record<string, SymbolViewProps['name']>;
 
 
@@ -55,6 +55,8 @@ type TaskCardProps = {
   onToggleImportant: (task: Task) => void;
   /** Opens the task details. */
   onOpen: (task: Task) => void;
+  /** Opens the task's chat directly. */
+  onOpenChat: (task: Task) => void;
 };
 
 function TaskCardBase({
@@ -67,6 +69,7 @@ function TaskCardBase({
   onReassign,
   onToggleImportant,
   onOpen,
+  onOpenChat,
 }: TaskCardProps) {
   const authorId = refId(task.author);
   const assigneeId = refId(task.assigned);
@@ -166,17 +169,22 @@ function TaskCardBase({
               Important
             </Text>
           </Pressable>
-          <View
-            className="w-10 items-center justify-center rounded-lg bg-primary"
-            accessibilityLabel={unread > 0 ? `${unread} unread ${unread === 1 ? 'message' : 'messages'}` : 'No unread messages'}
+          <Pressable
+            onPress={() => onOpenChat(task)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unread > 0 ? `Open chat, ${unread} unread ${unread === 1 ? 'message' : 'messages'}` : 'Open chat'
+            }
+            className="w-10 items-center justify-center rounded-lg bg-primary active:opacity-80"
           >
-            <SymbolView name={ICONS.mail} size={16} tintColor="#ffffff" />
+            <SymbolView name={ICONS.chat} size={17} tintColor="#ffffff" />
             {unread > 0 ? (
               <View className="absolute -right-1.5 -top-1.5 h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-red-600 px-0.5">
                 <Text className="text-[9px] font-bold text-white">{unread > 9 ? '9+' : unread}</Text>
               </View>
             ) : null}
-          </View>
+          </Pressable>
         </View>
 
         {showFinish ? (

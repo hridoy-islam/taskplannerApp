@@ -1,13 +1,13 @@
 import { Link, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text, TextInput, type TextInputInstance } from 'react-native';
 
 import { AuthField } from '@/components/auth/auth-field';
 import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Brand } from '@/constants/theme';
 import { useAppDispatch } from '@/hooks/use-redux';
-import { getErrorMessage, isValidEmail } from '@/lib/auth-errors';
+import { authErrorField, getErrorMessage, isValidEmail } from '@/lib/auth-errors';
 import { registerUser } from '@/redux/features/authSlice';
 
 type Errors = Partial<Record<'name' | 'email' | 'phone' | 'password', string>>;
@@ -23,9 +23,9 @@ export default function SignupScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const emailRef = useRef<TextInput>(null);
-  const phoneRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const phoneRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const handleSignup = async () => {
     const next: Errors = {};
@@ -44,7 +44,11 @@ export default function SignupScreen() {
       ).unwrap();
       router.replace('/(public)/login');
     } catch (err) {
-      setFormError(getErrorMessage(err, 'Could not create your account.'));
+      // Shown under the field it's about (e.g. "Email already exists"), otherwise below the form.
+      const message = getErrorMessage(err, 'Could not create your account.');
+      const field = authErrorField(message);
+      if (field) setErrors({ [field]: message });
+      else setFormError(message);
     } finally {
       setSubmitting(false);
     }

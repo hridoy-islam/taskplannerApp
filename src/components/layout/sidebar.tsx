@@ -9,7 +9,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { Avatar } from '@/components/ui/avatar';
 import { IconButton } from '@/components/ui/icon-button';
 import { IconTile } from '@/components/ui/icon-tile';
-import { SIDEBAR_ITEMS } from '@/constants/navigation';
+import { sidebarItemsFor } from '@/constants/navigation';
 import { useCurrentUser } from '@/hooks/use-current-user';
 
 const SIDEBAR_WIDTH = 296;
@@ -69,8 +69,8 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <Text className="mb-2 px-2 text-[11px] font-bold tracking-widest text-slate-900">TASKS</Text>
 
           <View className="gap-1">
-            {SIDEBAR_ITEMS.map((item) => {
-              const active = pathname === item.href;
+            {sidebarItemsFor(user?.role).map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href as string}/`);
               return (
                 <Pressable
                   key={item.name}

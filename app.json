@@ -10,7 +10,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.cyberpeer.taskplanner"
+      "bundleIdentifier": "com.cyberpeer.taskplanner",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -47,8 +51,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Taskplanner to access your photos to set your profile picture.",
-          "cameraPermission": "Allow Taskplanner to use your camera to take a profile picture.",
+          "photosPermission": "Allow Task Planner to access your photos to set your profile picture and share pictures in chats.",
+          "cameraPermission": "Allow Task Planner to use your camera to take a profile picture.",
           "microphonePermission": false
         }
       ],

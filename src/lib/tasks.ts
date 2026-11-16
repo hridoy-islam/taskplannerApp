@@ -304,20 +304,39 @@ export async function uploadTaskFile(taskId: string, file: { uri: string; name: 
 }
 
 /** A chat file's URL and whether it's an image (content may be a URL or a JSON blob). */
-export function parseFileComment(content: string): { url: string; isImage: boolean; name: string } {
+export function parseFileComment(content: string): { url: string; isImage: boolean; name: string; mime?: string } {
   let url = content;
   let mime: string | undefined;
+  let originalName: string | undefined;
   const trimmed = content.trim();
   if (trimmed.startsWith('{')) {
     try {
       const parsed = JSON.parse(trimmed);
       url = parsed.url || parsed.fileUrl || parsed.cdnUrl || content;
       mime = parsed.mimeType;
+      originalName = parsed.originalFilename;
     } catch {
       // Not JSON; treat as a URL.
     }
   }
   const isImage = mime?.startsWith('image/') || /\.(png|jpe?g|gif|webp|heic|bmp)(\?|$)/i.test(url) || url.startsWith('data:image/');
-  const name = decodeURIComponent(url.split('?')[0].split('/').pop() || 'File');
-  return { url, isImage: !!isImage, name };
+  let name = originalName || url.split('?')[0].split('/').pop() || 'File';
+  try {
+    name = decodeURIComponent(name);
+  } catch {
+    // Keep the raw name if it isn't valid URI encoding.
+  }
+  return { url, isImage: !!isImage, name, mime };
+}
+
+/* ---------------------------------------------------------------------------
+ * Planner (same endpoint as the web CompanyTaskPlanner).
+ * ------------------------------------------------------------------------- */
+
+/** Pending tasks assigned to the user that are due in the given month (month is 1–12). */
+export async function fetchPlannerTasks(year: number, month: number, userId: string): Promise<Task[]> {
+  const mm = String(month).padStart(2, '0');
+  const res = await axiosInstance.get(`/task/planner/${year}/${mm}/${userId}`);
+  const data = res.data?.data ?? res.data;
+  return Array.isArray(data) ? data : [];
 }

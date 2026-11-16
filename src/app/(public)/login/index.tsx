@@ -1,23 +1,23 @@
 import { Link, Redirect } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
 import { AuthField } from '@/components/auth/auth-field';
 import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Brand } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/hooks/use-redux';
-import { isValidEmail } from '@/lib/auth-errors';
-import { toast, toastError } from '@/lib/toast';
+import { authErrorField, getErrorMessage, isValidEmail } from '@/lib/auth-errors';
 import { loginUser, resetError } from '@/redux/features/authSlice';
 
 export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const { loading, error, user } = useAppSelector((state) => state.auth);
+  const [formError, setFormError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   if (user) {
     return <Redirect href="/" />;
@@ -28,12 +28,24 @@ export default function LoginScreen() {
     if (!isValidEmail(email)) next.email = 'Enter a valid email address';
     if (!password) next.password = 'Enter your password';
     setFieldErrors(next);
+    setFormError(null);
     if (Object.keys(next).length) return;
 
+    // No toasts on the auth screens: errors show under the field they're about, otherwise below the form.
+    // Success needs no message — the app opens.
     dispatch(loginUser({ email: email.trim(), password }))
       .unwrap()
-      .then((res: any) => toast.success('Welcome back!', res?.data?.user?.name ? `Signed in as ${res.data.user.name}` : 'Signed in successfully.'))
-      .catch((err) => toastError(err, 'Login failed'));
+      .catch((err) => {
+        const message = getErrorMessage(err, 'Login failed. Please try again.');
+        const field = authErrorField(message);
+        if (field) setFieldErrors({ [field]: message });
+        else setFormError(message);
+      });
+  };
+
+  const clearErrors = () => {
+    if (error) dispatch(resetError());
+    if (formError) setFormError(null);
   };
 
   return (
@@ -43,7 +55,8 @@ export default function LoginScreen() {
         value={email}
         onChangeText={(t) => {
           setEmail(t);
-          if (error) dispatch(resetError());
+          clearErrors();
+          if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
         }}
         placeholder="you@example.com"
         autoCapitalize="none"
@@ -62,7 +75,8 @@ export default function LoginScreen() {
           value={password}
           onChangeText={(t) => {
             setPassword(t);
-            if (error) dispatch(resetError());
+            clearErrors();
+            if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
           }}
           placeholder="Enter your password"
           autoComplete="password"
@@ -77,7 +91,7 @@ export default function LoginScreen() {
         </Link>
       </View>
 
-      {error ? <Text style={styles.error}>{String(error)}</Text> : null}
+      {formError ? <Text style={styles.error}>{formError}</Text> : null}
 
       <Button title="Log in" size="lg" onPress={handleLogin} loading={loading} disabled={loading} />
 

@@ -1,12 +1,10 @@
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
-  Linking,
   type ListRenderItem,
   Platform,
   Pressable,
@@ -17,6 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Socket } from 'socket.io-client';
 
+import { AttachMenu, UploadQueue, useChatUploads } from '@/components/chat/chat-uploads';
+import { useFileViewer, type ViewableFile } from '@/components/files/file-viewer';
+import { AttachmentsSheet } from '@/components/tasks/chat-attachments';
 import { getInitials } from '@/components/ui/avatar';
 import { DotLoader } from '@/components/ui/dot-loader';
 import { useAppSelector } from '@/hooks/use-redux';
@@ -33,11 +34,15 @@ import {
   refId,
   refName,
   type TaskDetail,
-  uploadTaskFile,
 } from '@/lib/tasks';
+import { uploadChatFile } from '@/lib/chat-uploads';
 import { toast, toastError } from '@/lib/toast';
 
 const TYPING_TIMEOUT_MS = 3000;
+/** Task names longer than this are cut with "…" in the chat header (the web truncates at 30). */
+const TITLE_MAX = 30;
+
+const truncate = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
 
 /** Time for today's messages, otherwise "dd MMM, yyyy · time". */
 function formatMessageTime(value?: string) {
@@ -78,8 +83,9 @@ export default function TaskChatScreen() {
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [editing, setEditing] = useState<Comment | null>(null);
 
@@ -239,35 +245,10 @@ export default function TaskChatScreen() {
     }
   };
 
-  const onAttach = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      toast.error('Photo access needed', 'Allow photo access to send pictures.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-    if (result.canceled || !result.assets?.[0]) return;
-    const asset = result.assets[0];
-    const type = asset.mimeType ?? 'image/jpeg';
-    const name = asset.fileName ?? `photo.${type.split('/')[1] ?? 'jpg'}`;
-
-    setUploading(true);
-    try {
-      let file: any = { uri: asset.uri, name, type };
-      if (Platform.OS === 'web') {
-        const blob = await (await fetch(asset.uri)).blob();
-        file = new File([blob], name, { type });
-      }
-      const url = await uploadTaskFile(taskId, file);
-      if (!url) throw new Error('Upload failed');
-      await send(url, true);
-      toast.success('File sent');
-    } catch (e) {
-      toastError(e, 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
+  const uploads = useChatUploads({
+    upload: (file, options) => uploadChatFile(taskId, 'taskDoc', file, options),
+    send: (url) => send(url, true),
+  });
 
   const startEdit = useCallback((comment: Comment) => {
     setEditing(comment);
@@ -279,6 +260,8 @@ export default function TaskChatScreen() {
     setText('');
   };
 
+  const { openFile, viewer: fileViewer } = useFileViewer();
+
   // Inverted list: newest at the bottom, kept in view as messages arrive.
   const data = useMemo(() => [...comments].reverse(), [comments]);
 
@@ -288,10 +271,14 @@ export default function TaskChatScreen() {
       // In the inverted list the "previous" message (older) is at index + 1.
       const older = data[index + 1];
       const showName = !mine && (!older || refId(older.authorId) !== refId(item.authorId));
-      return <MessageBubble comment={item} mine={mine} showName={showName} onEdit={startEdit} />;
+      return <MessageBubble comment={item} mine={mine} showName={showName} onEdit={startEdit} onOpenFile={openFile} />;
     },
-    [me, data, startEdit]
+    [me, data, startEdit, openFile]
   );
+
+  // Files shared in this chat, newest first (for the ⋮ → Attachments sheet).
+  const files = useMemo(() => comments.filter((c) => c.isFile && !c.pending).reverse(), [comments]);
+  const taskTitle = truncate(task?.taskName ?? '', TITLE_MAX);
 
   const other = refId(task?.author) === me ? task?.assigned : task?.author;
   const otherName = refName(other) ?? 'Chat';
@@ -320,15 +307,29 @@ export default function TaskChatScreen() {
           <Text className="text-base font-bold text-black" numberOfLines={1}>
             {otherName}
           </Text>
-          <Text className="text-xs font-medium text-black" numberOfLines={1}>
-            {otherTyping ? 'typing…' : task?.taskName ?? ''}
+          <Text className="text-xs font-medium text-black" numberOfLines={1} ellipsizeMode="tail">
+            {otherTyping ? 'typing…' : taskTitle}
           </Text>
         </View>
-        <View
-          className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-emerald-500' : 'bg-red-500'}`}
-          accessibilityLabel={connected ? 'Connected' : 'Connecting'}
-        />
+        <Pressable
+          onPress={() => setAttachmentsOpen(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Media and docs"
+          className="h-10 w-10 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+        >
+          <SymbolView name={{ ios: 'photo.on.rectangle.angled', android: 'perm_media', web: 'perm_media' }} size={19} tintColor="#000000" />
+        </Pressable>
       </View>
+
+      <AttachmentsSheet
+        visible={attachmentsOpen}
+        files={files}
+        subtitle={taskTitle}
+        onClose={() => setAttachmentsOpen(false)}
+      />
+      {fileViewer}
+      <AttachMenu visible={attachOpen} onClose={() => setAttachOpen(false)} onPicked={uploads.add} />
 
       {loading ? (
         <View className="flex-1 items-center justify-center">
@@ -365,10 +366,12 @@ export default function TaskChatScreen() {
               <View className="mt-1 self-start rounded-2xl rounded-bl-md bg-white px-3 py-2.5">
                 <DotLoader size={6} label={`${otherName} is typing`} />
               </View>
-            ) : null
+            ) : undefined
           }
         />
       )}
+
+      <UploadQueue items={uploads.items} onCancel={uploads.cancel} onRetry={uploads.retry} />
 
       {/* Composer */}
       <View className="border-t border-slate-200 bg-white px-3 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
@@ -386,17 +389,12 @@ export default function TaskChatScreen() {
         <View className="flex-row items-end gap-2">
           {!editing ? (
             <Pressable
-              onPress={onAttach}
-              disabled={uploading}
-              accessibilityRole="button"
-              accessibilityLabel="Send a picture"
+              onPress={() => setAttachOpen(true)}
+                            accessibilityRole="button"
+              accessibilityLabel="Attach files"
               className="h-11 w-11 items-center justify-center rounded-full bg-slate-100 active:opacity-70"
             >
-              {uploading ? (
-                <DotLoader size={5} label="Uploading" />
-              ) : (
-                <SymbolView name={{ ios: 'paperclip', android: 'attach_file', web: 'attach_file' }} size={20} tintColor="#000000" />
-              )}
+              <SymbolView name={{ ios: 'paperclip', android: 'attach_file', web: 'attach_file' }} size={20} tintColor="#000000" />
             </Pressable>
           ) : null}
           <TextInput
@@ -432,11 +430,13 @@ const MessageBubble = memo(function MessageBubble({
   mine,
   showName,
   onEdit,
+  onOpenFile,
 }: {
   comment: Comment;
   mine: boolean;
   showName: boolean;
   onEdit: (c: Comment) => void;
+  onOpenFile: (f: ViewableFile) => void;
 }) {
   const file = comment.isFile ? parseFileComment(comment.content) : null;
   const canEdit = mine && !comment.isFile && !comment.pending && !comment._id.startsWith('local-');
@@ -446,7 +446,7 @@ const MessageBubble = memo(function MessageBubble({
       {showName ? <Text className="ml-1 text-[11px] font-bold text-black">{refName(comment.authorId) ?? 'User'}</Text> : null}
       <Pressable
         onLongPress={canEdit ? () => onEdit(comment) : undefined}
-        onPress={file ? () => Linking.openURL(file.url).catch(() => toast.error('Could not open file')) : undefined}
+        onPress={file ? () => onOpenFile(file) : undefined}
         delayLongPress={300}
         accessibilityHint={canEdit ? 'Long press to edit' : file ? 'Opens the file' : undefined}
         className={`overflow-hidden rounded-2xl ${

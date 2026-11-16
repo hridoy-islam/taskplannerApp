@@ -7,7 +7,7 @@ import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Brand } from '@/constants/theme';
 import { useAppDispatch } from '@/hooks/use-redux';
-import { getErrorMessage, isValidEmail } from '@/lib/auth-errors';
+import { authErrorField, getErrorMessage, isValidEmail } from '@/lib/auth-errors';
 import { requestOtp } from '@/redux/features/authSlice';
 
 export default function ForgotPasswordScreen() {
@@ -30,7 +30,10 @@ export default function ForgotPasswordScreen() {
       await dispatch(requestOtp({ email: email.trim() })).unwrap();
       router.push({ pathname: '/(public)/verify-otp', params: { email: email.trim() } });
     } catch (err) {
-      setFormError(getErrorMessage(err, 'Could not send the code.'));
+      // e.g. "User not found" goes under the email field.
+      const message = getErrorMessage(err, 'Could not send the code.');
+      if (authErrorField(message)) setFieldError(message);
+      else setFormError(message);
     } finally {
       setSubmitting(false);
     }

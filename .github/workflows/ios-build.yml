@@ -1,0 +1,77 @@
+# Builds an unsigned iPhone app (.ipa) on GitHub's macOS machines — no Mac or Expo account needed.
+# Run it from GitHub → Actions → "iOS build" → Run workflow, then download the "TaskPlanner-ipa" artifact
+# and install it on the iPhone with Sideloadly (it signs the app with your Apple ID).
+name: iOS build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Newest macOS image: SDK 58 / React Native 0.88 need a recent Xcode.
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # .env is not in the repo, so the app's public URLs are set here.
+      EXPO_PUBLIC_API_URL: https://api.taskplanner.co.uk/api
+      EXPO_PUBLIC_SOCKET_URL: https://api.taskplanner.co.uk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # .npmrc (legacy-peer-deps) is picked up automatically.
+      - name: Install packages
+        run: npm ci
+
+      - name: Generate the iOS project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build (Release, unsigned)
+        run: |
+          set -o pipefail
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Building $SCHEME from $WORKSPACE"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee xcodebuild.log | grep -E "error:|warning: .*deprecated|\*\* BUILD" || true
+          grep -q "\*\* BUILD SUCCEEDED \*\*" xcodebuild.log
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild.log
+          if-no-files-found: ignore
+
+      - name: Package .ipa
+        run: |
+          APP=$(ls -d build/Build/Products/Release-iphoneos/*.app | head -1)
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry TaskPlanner.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TaskPlanner-ipa
+          path: TaskPlanner.ipa
+          retention-days: 14

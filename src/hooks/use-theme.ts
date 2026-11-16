@@ -8,7 +8,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function useTheme() {
   const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
+  // RN 0.88 reports an unknown scheme as null (no more 'unspecified').
+  const theme = scheme === 'dark' ? 'dark' : 'light';
 
   return Colors[theme];
 }

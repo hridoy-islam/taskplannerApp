@@ -8,6 +8,7 @@ type TopBarProps = {
   /** Unread count shown on the bell. Hidden when 0. */
   notificationCount?: number;
   onNotificationsPress?: () => void;
+  /** Shows the add-colleague button when set. */
   onAddUserPress?: () => void;
 };
 
@@ -45,13 +46,16 @@ export function TopBar({ onToggleSidebar, notificationCount = 0, onNotifications
           ) : null}
         </View>
 
-        <IconButton
-          icon={{ ios: 'person.badge.plus', android: 'person_add', web: 'person_add' }}
-          label="Add user"
-          variant="solid"
-          shape="circle"
-          onPress={onAddUserPress}
-        />
+        {/* Only shown when the screen allows it (company director). */}
+        {onAddUserPress ? (
+          <IconButton
+            icon={{ ios: 'person.badge.plus', android: 'person_add', web: 'person_add' }}
+            label="Add colleague"
+            variant="solid"
+            shape="circle"
+            onPress={onAddUserPress}
+          />
+        ) : null}
       </View>
     </View>
   );

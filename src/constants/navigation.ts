@@ -15,6 +15,8 @@ export type NavItem = {
   activeIcon?: NavIcon;
   description?: string;
   tint?: TintName;
+  /** Roles that can see this item; visible to everyone when omitted. */
+  roles?: string[];
 };
 
 /** Bottom navbar tabs. Profile is handled separately (it opens a menu). */
@@ -88,10 +90,35 @@ export const SIDEBAR_ITEMS: NavItem[] = [
     description: 'Tasks with a date and time.',
     tint: 'green',
   },
+  {
+    name: 'staff',
+    label: 'Staff',
+    href: '/staff' as Href,
+    icon: { ios: 'person.2.badge.gearshape', android: 'manage_accounts', web: 'manage_accounts' },
+    description: 'Create and manage your staff.',
+    tint: 'purple',
+    // Company director and manager (web: Staff nav item for 'company' and 'creator').
+    roles: ['company', 'creator'],
+  },
 ];
 
+/** Sidebar / quick-link items the given role is allowed to see. */
+export function sidebarItemsFor(role?: string): NavItem[] {
+  return SIDEBAR_ITEMS.filter((item) => !item.roles || (!!role && item.roles.includes(role)));
+}
+
+/** Opened from the bell in the top bar (not shown in the sidebar or navbar). */
+export const NOTIFICATIONS_NAV_ITEM: NavItem = {
+  name: 'notifications',
+  label: 'Notifications',
+  href: '/notifications' as Href,
+  icon: { ios: 'bell', android: 'notifications', web: 'notifications' },
+  description: 'Your latest updates.',
+  tint: 'blue',
+};
+
 /** Every route inside the signed-in area. */
-export const ALL_NAV_ITEMS: NavItem[] = [...BOTTOM_NAV_ITEMS, PROFILE_NAV_ITEM, ...SIDEBAR_ITEMS];
+export const ALL_NAV_ITEMS: NavItem[] = [...BOTTOM_NAV_ITEMS, PROFILE_NAV_ITEM, ...SIDEBAR_ITEMS, NOTIFICATIONS_NAV_ITEM];
 
 export function getNavItem(name: string): NavItem {
   const item = ALL_NAV_ITEMS.find((i) => i.name === name);

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { SymbolView } from 'expo-symbols';
 import { forwardRef, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, View, type TextInputInstance } from 'react-native';
 import Animated, {
   interpolate,
   interpolateColor,
@@ -30,7 +30,7 @@ const LABEL_FLOATING_TOP = -LABEL_FLOATING_SIZE * 0.75;
  * Outlined input with a floating label: the label sits inside the empty field
  * and animates up onto the top border when focused or filled.
  */
-export const AuthField = forwardRef<TextInput, AuthFieldProps>(function AuthField(
+export const AuthField = forwardRef<TextInputInstance, AuthFieldProps>(function AuthField(
   { label, error, password = false, style, value, placeholder, onFocus, onBlur, ...props },
   ref
 ) {

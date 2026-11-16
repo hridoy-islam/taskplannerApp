@@ -49,6 +49,10 @@ type TaskListViewProps = {
   taskHrefBase: string;
   /** Extra header content (e.g. a "New Task" button); gets a reload callback. */
   headerAction?: (reload: () => void) => ReactNode;
+  /** Extra rule for which loaded tasks stay visible (e.g. Important hides a task once un-starred). */
+  filter?: (task: Task, me?: string) => boolean;
+  /** Reload every this many ms while the screen is mounted (the web Important page polls each minute). */
+  pollInterval?: number;
 };
 
 const keyExtractor = (t: Task) => t._id;
@@ -66,6 +70,8 @@ export function TaskListView({
   subtitle,
   taskHrefBase,
   headerAction,
+  filter,
+  pollInterval,
 }: TaskListViewProps) {
   const router = useRouter();
   const me: string | undefined = useAppSelector(
@@ -118,8 +124,20 @@ export function TaskListView({
     load(1);
   }, [load]);
 
+  useEffect(() => {
+    if (!pollInterval) return;
+    const id = setInterval(() => load(1), pollInterval);
+    return () => clearInterval(id);
+  }, [load, pollInterval]);
+
   const onOpen = useCallback(
     (task: Task) => router.push(`${taskHrefBase}/${task._id}?unread=${task.unreadMessageCount ?? 0}` as Href),
+    [router, taskHrefBase],
+  );
+
+  // The message button on a card goes straight to that task's chat.
+  const onOpenChat = useCallback(
+    (task: Task) => router.push(`${taskHrefBase}/${task._id}/chat` as Href),
     [router, taskHrefBase],
   );
 
@@ -215,10 +233,10 @@ export function TaskListView({
   );
 
   // Hide tasks I've already completed from the active lists (as the web app does).
-  const visible = useMemo(
-    () => (completedList ? tasks : tasks.filter((t) => !isCompletedBy(t, me))),
-    [tasks, completedList, me],
-  );
+  const visible = useMemo(() => {
+    const active = completedList ? tasks : tasks.filter((t) => !isCompletedBy(t, me));
+    return filter ? active.filter((t) => filter(t, me)) : active;
+  }, [tasks, completedList, me, filter]);
 
   const cardActions = actions ?? (completedList ? "none" : "auto");
 
@@ -234,6 +252,7 @@ export function TaskListView({
         onReassign={onReassign}
         onToggleImportant={onToggleImportant}
         onOpen={onOpen}
+        onOpenChat={onOpenChat}
       />
     ),
     [
@@ -245,6 +264,7 @@ export function TaskListView({
       onReassign,
       onToggleImportant,
       onOpen,
+      onOpenChat,
     ],
   );
 
@@ -300,7 +320,7 @@ export function TaskListView({
           <View className="py-4">
             <DotLoader size={8} label="Loading more tasks" />
           </View>
-        ) : null
+        ) : undefined
       }
     />
   );

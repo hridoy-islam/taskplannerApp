@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
 import { Brand } from '@/constants/theme';
 
@@ -14,7 +14,7 @@ type OtpInputProps = {
  * SMS/email autofill work and backspace behaves naturally.
  */
 export function OtpInput({ length = 4, value, onChange }: OtpInputProps) {
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const [focused, setFocused] = useState(false);
 
   return (

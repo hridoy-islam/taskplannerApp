@@ -10,6 +10,8 @@ export type CurrentUser = {
   role?: string;
   phone?: string;
   address?: string;
+  /** Company id (or populated company) for managers and staff. */
+  company?: string | { _id: string; name?: string };
   /** Loadable image URL (already resolved against the API). */
   image?: string;
 };

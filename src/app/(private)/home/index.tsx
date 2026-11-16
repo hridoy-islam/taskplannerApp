@@ -6,6 +6,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Page } from '@/components/layout/page';
 import { Avatar } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type NavItem, sidebarItemsFor } from '@/constants/navigation';
 import { type TintName, Tints } from '@/constants/theme';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { formatDisplayDate, ukNow } from '@/lib/date';
@@ -115,6 +116,7 @@ export default function HomeScreen() {
   // Counts are applied together, so the first load is over once any of them is present.
   const loading = !counts[TODAY.key];
   const open = (stat: TaskStat) => router.push(`/home/tasks/${stat.key}` as Href);
+  const quickLinks = sidebarItemsFor(user?.role);
 
   return (
     <Page>
@@ -166,6 +168,28 @@ export default function HomeScreen() {
               ))}
             </View>
           </>
+        )}
+      </View>
+
+      {/* Quick links: every sidebar destination */}
+      <View className="gap-3">
+        <Text className="text-[17px] font-bold tracking-tight text-slate-900">Quick links</Text>
+        {loading ? (
+          <QuickLinksSkeleton items={quickLinks} />
+        ) : (
+          <QuickLinksGrid>
+            {(width) =>
+              quickLinks.map((item, i) => (
+                <QuickLinkCard
+                  key={item.name}
+                  item={item}
+                  width={width}
+                  color={QUICK_LINK_COLORS[i % QUICK_LINK_COLORS.length]}
+                  onPress={() => router.navigate(item.href)}
+                />
+              ))
+            }
+          </QuickLinksGrid>
         )}
       </View>
     </Page>
@@ -283,5 +307,107 @@ function StatCard({ stat, count, onPress }: CardProps) {
         </Text>
       </View>
     </ColorCard>
+  );
+}
+
+/**
+ * Quick-link colours: deliberately different from the Task overview palette.
+ * Full class names are written out so Tailwind picks them up.
+ */
+const QUICK_LINK_COLORS = ['bg-cyan-600', 'bg-rose-600', 'bg-indigo-600', 'bg-orange-600', 'bg-teal-600', 'bg-fuchsia-600'];
+
+const QUICK_LINK_GAP = 12;
+/** Same height as the Overdue / Task overview stat cards. */
+const QUICK_LINK_HEIGHT = 128;
+
+/**
+ * Two-column grid. Measures its own width and hands every card the same exact pixel width,
+ * so a card alone on the last row is identical in size to the others.
+ */
+function QuickLinksGrid({ children }: { children: (cardWidth: number) => ReactNode }) {
+  const [width, setWidth] = useState(0);
+  // Round down: fractional widths can add up to slightly more than the row and wrap to one column.
+  const cardWidth = width > 0 ? Math.floor((width - QUICK_LINK_GAP) / 2) - 1 : 0;
+
+  return (
+    <View
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        rowGap: QUICK_LINK_GAP,
+      }}
+    >
+      {cardWidth > 0 ? children(cardWidth) : null}
+    </View>
+  );
+}
+
+/** Colourful card linking to a sidebar destination; every card has the same fixed size. */
+function QuickLinkCard({
+  item,
+  color,
+  width,
+  onPress,
+}: {
+  item: NavItem;
+  color: string;
+  width: number;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ width, height: QUICK_LINK_HEIGHT }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        className={`flex-1 justify-between overflow-hidden rounded-2xl p-4 shadow-md shadow-slate-900/15 active:scale-[0.98] active:opacity-90 ${color}`}
+      >
+        {/* Decorative circles */}
+        <View className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-white/15" />
+        <View className="absolute -bottom-10 -left-4 h-20 w-20 rounded-full bg-white/10" />
+
+        <View className="h-[42px] w-[42px] items-center justify-center rounded-full bg-white/20">
+          <SymbolView name={item.icon} size={20} tintColor="#ffffff" />
+        </View>
+
+        <View>
+          <Text className="text-[17px] font-bold leading-[22px] text-white" numberOfLines={1}>
+            {item.label}
+          </Text>
+          {item.description ? (
+            <Text className="text-sm leading-5 text-white/85" numberOfLines={1}>
+              {item.description}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+/** Placeholders for the quick links, same size and layout as the real cards. */
+function QuickLinksSkeleton({ items }: { items: NavItem[] }) {
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityLabel="Loading quick links">
+      <QuickLinksGrid>
+        {(width) =>
+          items.map((item) => (
+            <View
+              key={item.name}
+              className="justify-between rounded-2xl bg-brand-soft p-4"
+              style={{ width, height: QUICK_LINK_HEIGHT }}
+            >
+              <Skeleton width={42} height={42} radius={21} />
+              <View className="gap-2">
+                <Skeleton width="70%" height={16} />
+                <Skeleton width="90%" height={12} />
+              </View>
+            </View>
+          ))
+        }
+      </QuickLinksGrid>
+    </View>
   );
 }

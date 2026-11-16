@@ -11,17 +11,18 @@ const ENTER = FadeInUp.duration(220).easing(Easing.out(Easing.cubic));
 const EXIT = FadeOutUp.duration(160).easing(Easing.in(Easing.cubic));
 const LAYOUT = LinearTransition.duration(180);
 
-const TONES: Record<ToastType, { iconBg: string; icon: SymbolViewProps['name'] }> = {
+/** Every toast is primary with white text; errors use the destructive (red) variant. */
+const TONES: Record<ToastType, { bg: string; icon: SymbolViewProps['name'] }> = {
   success: {
-    iconBg: 'bg-emerald-500',
+    bg: 'bg-primary',
     icon: { ios: 'checkmark', android: 'check', web: 'check' },
   },
   error: {
-    iconBg: 'bg-red-500',
+    bg: 'bg-destructive',
     icon: { ios: 'exclamationmark', android: 'priority_high', web: 'priority_high' },
   },
   info: {
-    iconBg: 'bg-primary',
+    bg: 'bg-primary',
     icon: { ios: 'info', android: 'info', web: 'info' },
   },
 };
@@ -68,23 +69,23 @@ function ToastCard({ item }: { item: ToastItem }) {
         accessibilityRole="alert"
         accessibilityLabel={item.message ? `${item.title}. ${item.message}` : item.title}
         accessibilityHint="Tap to dismiss"
-        className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white py-3 pl-3 pr-3.5 shadow-sm shadow-slate-900/10 active:opacity-90"
-        style={{ elevation: 2 }}
+        className={`flex-row items-center gap-3 rounded-2xl py-3 pl-3 pr-3.5 shadow-md shadow-slate-900/25 active:opacity-90 ${tone.bg}`}
+        style={{ elevation: 4 }}
       >
-        <View className={`h-7 w-7 items-center justify-center rounded-full ${tone.iconBg}`}>
+        <View className="h-7 w-7 items-center justify-center rounded-full bg-white/20">
           <SymbolView name={tone.icon} size={14} tintColor="#ffffff" />
         </View>
         <View className="flex-1">
-          <Text className="text-sm font-bold text-black" numberOfLines={1}>
+          <Text className="text-sm font-bold text-white" numberOfLines={1}>
             {item.title}
           </Text>
           {item.message ? (
-            <Text className="text-[13px] leading-[18px] text-black" numberOfLines={3}>
+            <Text className="text-[13px] leading-[18px] text-white/90" numberOfLines={3}>
               {item.message}
             </Text>
           ) : null}
         </View>
-        <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={14} tintColor="#000000" />
+        <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={14} tintColor="#ffffff" />
       </Pressable>
     </Animated.View>
   );

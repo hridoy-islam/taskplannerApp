@@ -1,10 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { Platform } from 'react-native';
 
-import axiosInstance from '../../lib/axios';
+import axiosInstance, { clearAuthTokens, saveAuthTokens } from '../../lib/axios';
 
 interface UserCredentials {
   email: string;
@@ -106,7 +105,7 @@ export const loginUser = createAsyncThunk<UserResponse, UserCredentials, { rejec
     try {
       const request = await axiosInstance.post('/auth/login', userCredentials);
       const response = await request.data;
-      await AsyncStorage.setItem('watney', JSON.stringify(response.data.accessToken));
+      await saveAuthTokens(response.data);
       return response;
     } catch (error: any) {
       return rejectWithValue(error.response?.data || error.message);
@@ -122,7 +121,7 @@ export const authWithFbORGoogle = createAsyncThunk<
   try {
     const request = await axiosInstance.post('/auth/google', googleUserCredentials);
     const response = await request.data;
-    await AsyncStorage.setItem('watney', JSON.stringify(response.data.accessToken));
+    await saveAuthTokens(response.data);
     return response;
   } catch (error: any) {
     return rejectWithValue(error.response?.data || error.message);
@@ -181,6 +180,8 @@ export const verifyEmail = createAsyncThunk<any, { email: string; otp: string },
     try {
       const response = await axios.patch(
     `${process.env.EXPO_PUBLIC_API_URL}/auth/verifyemail`, { email, otp });
+      // Verifying returns both tokens; keep them so later requests are authorised and can refresh.
+      if (response.data?.data) await saveAuthTokens(response.data.data);
       return response.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data || err.message);
@@ -229,7 +230,7 @@ export const resendOtp = createAsyncThunk<any, { email: string }, { rejectValue:
 );
 
 export const logout = createAsyncThunk<void>('user/logout', async () => {
-  await AsyncStorage.removeItem('watney');
+  await clearAuthTokens();
 });
 
 const authSlice = createSlice({

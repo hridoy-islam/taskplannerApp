@@ -25,6 +25,10 @@ type TaskFormModalProps = {
   onClose: () => void;
   /** Should throw on failure so the form stays open. */
   onSubmit: (values: TaskFormValues) => Promise<void>;
+  /** Frequencies offered; defaults to all. Schedule tasks use daily/weekly/monthly only. */
+  frequencies?: TaskFrequency[];
+  /** Overrides the sheet title and submit label (defaults are for a normal task). */
+  labels?: { title?: string; submit?: string };
 };
 
 const PRIORITIES: { value: TaskPriority; label: string; on: string; text: string }[] = [
@@ -59,7 +63,8 @@ export function TaskFormModal(props: TaskFormModalProps) {
   return <TaskFormContent {...props} />;
 }
 
-function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit }: TaskFormModalProps) {
+function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit, frequencies, labels }: TaskFormModalProps) {
+  const frequencyOptions = frequencies ? FREQUENCIES.filter((f) => frequencies.includes(f.value)) : FREQUENCIES;
   const [values, setValues] = useState<TaskFormValues>({ ...EMPTY, ...initial });
   const [errors, setErrors] = useState<{ taskName?: string; dueDate?: string }>({});
   const [submitting, setSubmitting] = useState(false);
@@ -112,7 +117,7 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit }
           </View>
           <ScrollView contentContainerClassName="gap-4 p-5 pb-8" keyboardShouldPersistTaps="handled">
             <View>
-              <Text className="text-xl font-extrabold text-black">{mode === 'create' ? 'Create New Task' : 'Edit Task'}</Text>
+              <Text className="text-xl font-extrabold text-black">{labels?.title ?? (mode === 'create' ? 'Create New Task' : 'Edit Task')}</Text>
               {subtitle ? <Text className="text-sm font-medium text-black">{subtitle}</Text> : null}
             </View>
 
@@ -162,7 +167,7 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit }
 
             <Field label="Frequency">
               <View className="flex-row gap-2">
-                {FREQUENCIES.map((f) => {
+                {frequencyOptions.map((f) => {
                   const on = values.frequency === f.value;
                   return (
                     <Pressable
@@ -249,7 +254,7 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit }
             <View className="flex-row gap-3 pt-1">
               <Button title="Cancel" variant="dark" onPress={onClose} disabled={submitting} className="flex-1 rounded-xl" />
               <Button
-                title={mode === 'create' ? 'Create Task' : 'Save Changes'}
+                title={labels?.submit ?? (mode === 'create' ? 'Create Task' : 'Save Changes')}
                 onPress={submit}
                 loading={submitting}
                 className="flex-1 rounded-xl"
