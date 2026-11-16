@@ -8,9 +8,8 @@ on:
 
 jobs:
   build:
-    # Intel macOS runner: the Apple Silicon (arm64) runners behind macos-latest are often
-    # capacity-limited. Its Xcode 26.x matches Expo SDK 57; Intel builds the same iPhone app.
-    runs-on: macos-15-intel
+    # Apple Silicon macOS runner (faster than Intel). It can queue longer when GitHub is busy.
+    runs-on: macos-latest
     timeout-minutes: 90
     env:
       # .env is not in the repo, so the app's public URLs are set here.
