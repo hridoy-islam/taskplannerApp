@@ -8,8 +8,9 @@ on:
 
 jobs:
   build:
-    # Newest macOS image: SDK 58 / React Native 0.88 need a recent Xcode.
-    runs-on: macos-latest
+    # Intel macOS runner: the Apple Silicon (arm64) runners behind macos-latest are often
+    # capacity-limited. Intel builds the same iPhone (arm64) app; Xcode is picked below.
+    runs-on: macos-15-intel
     timeout-minutes: 90
     env:
       # .env is not in the repo, so the app's public URLs are set here.
