@@ -48,6 +48,13 @@ jobs:
                 echo "Swift 5 mode: $spec"
                 perl -pi -e "s/(swift_version\s*=\s*)['\"]6[0-9.]*['\"]/\1'5.0'/" "$spec"
               done
+          # Some modules (expo-modules-jsi) are built as Swift packages with their own language mode.
+          find node_modules -name "Package.swift" -print0 \
+            | xargs -0 grep -lE "swiftLanguageModes?[[:space:]]*:[[:space:]]*\[[[:space:]]*\.v6" \
+            | while read -r pkg; do
+                echo "Swift 5 mode: $pkg"
+                perl -pi -e "s/(swiftLanguageModes?\s*:\s*\[\s*)\.v6/\1.v5/" "$pkg"
+              done
 
       - name: Generate the iOS project
         run: npx expo prebuild --platform ios --clean
