@@ -36,6 +36,19 @@ jobs:
       - name: Install packages
         run: npm ci
 
+      # SDK 58's Expo modules compile in Swift 6 language mode, where data-race diagnostics are
+      # errors. The newest Xcode on this runner (26.x) rejects code that newer Xcode accepts
+      # (e.g. expo-modules-jsi "sending 'slot' risks causing data races"). Swift 5 mode turns those
+      # diagnostics into warnings; the code and runtime behaviour are unchanged. CI only.
+      - name: Compile Expo pods in Swift 5 language mode
+        run: |
+          find node_modules -name "*.podspec" -print0 \
+            | xargs -0 grep -lE "swift_version[[:space:]]*=[[:space:]]*['\"]6" \
+            | while read -r spec; do
+                echo "Swift 5 mode: $spec"
+                perl -pi -e "s/(swift_version\s*=\s*)['\"]6[0-9.]*['\"]/\1'5.0'/" "$spec"
+              done
+
       - name: Generate the iOS project
         run: npx expo prebuild --platform ios --clean
 
