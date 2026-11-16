@@ -57,7 +57,21 @@ jobs:
               done
 
       - name: Generate the iOS project
-        run: npx expo prebuild --platform ios --clean
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      # pod install downloads large React Native/Hermes tarballs from repo.reactnative.dev; the
+      # connection sometimes drops ("Connection reset by peer"), so retry. Fails the job clearly
+      # (instead of a confusing "no .xcworkspace" later) if it never succeeds.
+      - name: Install CocoaPods (with retries)
+        working-directory: ios
+        run: |
+          for attempt in 1 2 3; do
+            echo "pod install — attempt $attempt"
+            if pod install; then break; fi
+            if [ "$attempt" = 3 ]; then echo "::error::pod install failed 3 times"; exit 1; fi
+            sleep 30
+          done
+          ls -d *.xcworkspace
 
       - name: Build (Release, unsigned)
         run: |
