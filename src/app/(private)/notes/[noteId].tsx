@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { type SymbolViewProps, SymbolView } from 'expo-symbols';
 import moment from 'moment';
 import { useEffect, useRef, useState } from 'react';
@@ -120,30 +120,31 @@ export default function NoteEditorScreen() {
   };
 
   // Ask before leaving with unsaved changes (back button, gesture or hardware back).
-  // SDK 58: `usePreventRemove` replaces the removed `beforeRemove` event; `repeat()` resumes the blocked navigation.
-  const [allowLeave, setAllowLeave] = useState(false);
-  usePreventRemove(dirty && !allowLeave, ({ repeat }) => {
-    Alert.alert('Unsaved changes', 'Save your changes before leaving?', [
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          setAllowLeave(true);
-          repeat();
-        },
-      },
-      { text: 'Keep editing', style: 'cancel' },
-      {
-        text: 'Save',
-        onPress: async () => {
-          if (await save()) {
-            setAllowLeave(true);
-            repeat();
-          }
-        },
-      },
-    ]);
+  const navigation = useNavigation();
+  const dirtyRef = useRef(dirty);
+  const saveRef = useRef(save);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+    saveRef.current = save;
   });
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', (e) => {
+        if (!dirtyRef.current) return;
+        e.preventDefault();
+        Alert.alert('Unsaved changes', 'Save your changes before leaving?', [
+          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+          { text: 'Keep editing', style: 'cancel' },
+          {
+            text: 'Save',
+            onPress: async () => {
+              if (await saveRef.current()) navigation.dispatch(e.data.action);
+            },
+          },
+        ]);
+      }),
+    [navigation]
+  );
 
   const goBack = () => (router.canGoBack() ? router.back() : router.navigate('/notes' as Href));
 
@@ -192,7 +193,7 @@ export default function NoteEditorScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          setAllowLeave(true); // leaving after delete: no unsaved-changes prompt
+          dirtyRef.current = false;
           await removeNote(note._id);
           goBack();
         },

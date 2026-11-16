@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, type TextInputInstance } from 'react-native';
+import { StyleSheet, Text, TextInput } from 'react-native';
 
 import { AuthField } from '@/components/auth/auth-field';
 import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
@@ -23,9 +23,9 @@ export default function SignupScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const emailRef = useRef<TextInputInstance>(null);
-  const phoneRef = useRef<TextInputInstance>(null);
-  const passwordRef = useRef<TextInputInstance>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const handleSignup = async () => {
     const next: Errors = {};

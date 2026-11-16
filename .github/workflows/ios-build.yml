@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     # Intel macOS runner: the Apple Silicon (arm64) runners behind macos-latest are often
-    # capacity-limited. Intel builds the same iPhone (arm64) app; Xcode is picked below.
+    # capacity-limited. Its Xcode 26.x matches Expo SDK 57; Intel builds the same iPhone app.
     runs-on: macos-15-intel
     timeout-minutes: 90
     env:
@@ -35,26 +35,6 @@ jobs:
       # .npmrc (legacy-peer-deps) is picked up automatically.
       - name: Install packages
         run: npm ci
-
-      # SDK 58's Expo modules compile in Swift 6 language mode, where data-race diagnostics are
-      # errors. The newest Xcode on this runner (26.x) rejects code that newer Xcode accepts
-      # (e.g. expo-modules-jsi "sending 'slot' risks causing data races"). Swift 5 mode turns those
-      # diagnostics into warnings; the code and runtime behaviour are unchanged. CI only.
-      - name: Compile Expo pods in Swift 5 language mode
-        run: |
-          find node_modules -name "*.podspec" -print0 \
-            | xargs -0 grep -lE "swift_version[[:space:]]*=[[:space:]]*['\"]6" \
-            | while read -r spec; do
-                echo "Swift 5 mode: $spec"
-                perl -pi -e "s/(swift_version\s*=\s*)['\"]6[0-9.]*['\"]/\1'5.0'/" "$spec"
-              done
-          # Some modules (expo-modules-jsi) are built as Swift packages with their own language mode.
-          find node_modules -name "Package.swift" -print0 \
-            | xargs -0 grep -lE "swiftLanguageModes?[[:space:]]*:[[:space:]]*\[[[:space:]]*\.v6" \
-            | while read -r pkg; do
-                echo "Swift 5 mode: $pkg"
-                perl -pi -e "s/(swiftLanguageModes?\s*:\s*\[\s*)\.v6/\1.v5/" "$pkg"
-              done
 
       - name: Generate the iOS project
         run: npx expo prebuild --platform ios --clean --no-install

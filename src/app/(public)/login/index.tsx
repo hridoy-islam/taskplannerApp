@@ -1,6 +1,6 @@
 import { Link, Redirect } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AuthField } from '@/components/auth/auth-field';
 import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
@@ -17,7 +17,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
-  const passwordRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   if (user) {
     return <Redirect href="/" />;

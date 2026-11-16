@@ -1,7 +1,7 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { jwtDecode } from 'jwt-decode';
 import { useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, type TextInputInstance } from 'react-native';
+import { StyleSheet, Text, TextInput } from 'react-native';
 
 import { AuthField } from '@/components/auth/auth-field';
 import { AuthLayout, Subtitle } from '@/components/auth/auth-layout';
@@ -24,7 +24,7 @@ export default function ResetPasswordScreen() {
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const confirmRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInput>(null);
 
   // The reset token from the OTP step carries the user's id.
   const userId = useMemo(() => {

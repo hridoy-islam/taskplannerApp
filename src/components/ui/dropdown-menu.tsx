@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import { useRef, useState } from 'react';
-import { Modal, Platform, Pressable, Text, useWindowDimensions, View, type ViewInstance } from 'react-native';
+import { Modal, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 export type DropdownItem = {
   label: string;
@@ -19,7 +19,7 @@ const ACTION_DELAY = Platform.OS === 'ios' ? 350 : 0;
  * ⋮ button that opens a WhatsApp-style menu anchored under it (top-right, plain text rows).
  */
 export function DropdownMenu({ items, label = 'More options' }: { items: DropdownItem[]; label?: string }) {
-  const triggerRef = useRef<ViewInstance>(null);
+  const triggerRef = useRef<View>(null);
   const { width: screenWidth } = useWindowDimensions();
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const visibleItems = items.filter((i) => !i.hidden);
