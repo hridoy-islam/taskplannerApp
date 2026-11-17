@@ -71,6 +71,13 @@ export function isSameUkDay(a: DateInput, b: DateInput) {
   return !!ma && !!mb && ma.isSame(mb, 'day');
 }
 
+/** Same clock minute (e.g. both 14:07), used to show one time under a burst of chat messages. */
+export function isSameUkMinute(a: DateInput, b: DateInput) {
+  const ma = ukMoment(a);
+  const mb = ukMoment(b);
+  return !!ma && !!mb && ma.isSame(mb, 'minute');
+}
+
 /** Next date on a weekday (0 = Sun … 6 = Sat), from today in UK time (same as the web form). */
 export function nextUkWeekday(dayIndex: number): Date {
   const today = ukNow().startOf('day');

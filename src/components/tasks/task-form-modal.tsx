@@ -1,7 +1,9 @@
 import { type ReactNode, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
+import { KeyboardPaddingView } from '@/components/ui/keyboard-avoiding-view';
 import { DateField } from '@/components/ui/date-field';
 import { formatDisplayDate, INPUT_FORMAT_HINT, nextUkMonthDay, nextUkWeekday, ukStartOfToday } from '@/lib/date';
 import type { TaskFrequency, TaskPriority } from '@/lib/tasks';
@@ -68,6 +70,7 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit, 
   const [values, setValues] = useState<TaskFormValues>({ ...EMPTY, ...initial });
   const [errors, setErrors] = useState<{ taskName?: string; dueDate?: string }>({});
   const [submitting, setSubmitting] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const set = <K extends keyof TaskFormValues>(key: K, value: TaskFormValues[K]) => {
     setValues((v) => ({ ...v, [key]: value }));
@@ -108,14 +111,19 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit, 
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={submitting ? undefined : onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end bg-black/50">
+      <KeyboardPaddingView bottomInset={insets.bottom} className="flex-1 justify-end bg-black/50">
         <Pressable className="absolute inset-0" onPress={submitting ? undefined : onClose} accessibilityLabel="Close" />
 
         <View className="max-h-[92%] rounded-t-3xl bg-white">
           <View className="items-center pt-2.5">
             <View className="h-1 w-10 rounded-full bg-slate-300" />
           </View>
-          <ScrollView contentContainerClassName="gap-4 p-5 pb-8" keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerClassName="gap-4 p-5"
+            // Keep Cancel / Create clear of the Android navigation bar (the modal is edge-to-edge).
+            contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+            keyboardShouldPersistTaps="handled"
+          >
             <View>
               <Text className="text-xl font-extrabold text-black">{labels?.title ?? (mode === 'create' ? 'Create New Task' : 'Edit Task')}</Text>
               {subtitle ? <Text className="text-sm font-medium text-black">{subtitle}</Text> : null}
@@ -262,7 +270,7 @@ function TaskFormContent({ visible, mode, subtitle, initial, onClose, onSubmit, 
             </View>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardPaddingView>
     </Modal>
   );
 }

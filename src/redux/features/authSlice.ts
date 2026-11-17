@@ -229,6 +229,23 @@ export const resendOtp = createAsyncThunk<any, { email: string }, { rejectValue:
   }
 );
 
+/**
+ * Saves the "Complete your profile" answers and marks the account as authorized
+ * (same endpoint and payload as the website's personal-details page).
+ */
+export const completePersonalInformation = createAsyncThunk<
+  any,
+  { userId: string; profileData: Record<string, unknown> },
+  { rejectValue: any }
+>('auth/personalInformation', async ({ userId, profileData }, { rejectWithValue }) => {
+  try {
+    const response = await axiosInstance.patch(`/auth/users/${userId}`, { ...profileData, authorized: true });
+    return response.data?.data;
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data || error.message);
+  }
+});
+
 export const logout = createAsyncThunk<void>('user/logout', async () => {
   await clearAuthTokens();
 });
@@ -329,7 +346,9 @@ const authSlice = createSlice({
         
         state.loading = false;
         state.token = accessToken;
+        // Keep what the login token knew (e.g. authorized, company) — the verify token carries fewer fields.
         state.user = {
+          ...state.user,
           ...decoded,
           isValided: true
         };
@@ -338,6 +357,9 @@ const authSlice = createSlice({
       .addCase(verifyEmail.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || 'Verification failed';
+      })
+      .addCase(completePersonalInformation.fulfilled, (state) => {
+        if (state.user) state.user = { ...state.user, authorized: true };
       })
       
   }

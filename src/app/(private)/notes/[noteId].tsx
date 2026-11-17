@@ -3,10 +3,11 @@ import { type SymbolViewProps, SymbolView } from 'expo-symbols';
 import moment from 'moment';
 import { useEffect, useRef, useState } from 'react';
 import { actions, RichEditor, RichToolbar } from 'react-native-pell-rich-editor';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LinkSheet, NoteTitleSheet, ShareNoteSheet, TagPickerSheet } from '@/components/notes/note-sheets';
+import { KeyboardPaddingView } from '@/components/ui/keyboard-avoiding-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppDispatch, useAppSelector } from '@/hooks/use-redux';
 import { normaliseHtml, noteAuthorId, noteAuthorName, type NoteTag } from '@/lib/notes';
@@ -224,7 +225,7 @@ export default function NoteEditorScreen() {
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-white" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardPaddingView className="flex-1 bg-white" bottomInset={insets.bottom}>
       <TopBar
         onBack={goBack}
         right={
@@ -316,8 +317,21 @@ export default function NoteEditorScreen() {
           </View>
         ) : null}
 
-        {/* Content (rich text) */}
+        {/* Content (rich text), with the formatting buttons (same tools as the web editor) on top */}
         <View className="min-h-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          {!readOnly ? (
+            <View className="border-b border-slate-200 bg-white">
+              <RichToolbar
+                editor={editorRef}
+                actions={TOOLBAR_ACTIONS}
+                iconMap={TOOLBAR_ICONS}
+                iconTint="#000000"
+                selectedIconTint="#2563eb"
+                onInsertLink={() => setLinkOpen(true)}
+                style={{ backgroundColor: '#ffffff', height: 48 }}
+              />
+            </View>
+          ) : null}
           <RichEditor
             key={note._id}
             ref={editorRef}
@@ -332,21 +346,6 @@ export default function NoteEditorScreen() {
           />
         </View>
       </ScrollView>
-
-      {/* Formatting toolbar (same tools as the web editor), above the keyboard */}
-      {!readOnly ? (
-        <View className="border-t border-slate-200 bg-white" style={{ paddingBottom: insets.bottom }}>
-          <RichToolbar
-            editor={editorRef}
-            actions={TOOLBAR_ACTIONS}
-            iconMap={TOOLBAR_ICONS}
-            iconTint="#000000"
-            selectedIconTint="#2563eb"
-            onInsertLink={() => setLinkOpen(true)}
-            style={{ backgroundColor: '#ffffff', height: 48 }}
-          />
-        </View>
-      ) : null}
 
       <LinkSheet
         visible={linkOpen}
@@ -370,7 +369,7 @@ export default function NoteEditorScreen() {
         onShare={share}
         onRemove={unshare}
       />
-    </KeyboardAvoidingView>
+    </KeyboardPaddingView>
   );
 }
 

@@ -4,10 +4,8 @@ import { SymbolView } from 'expo-symbols';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
   type ListRenderItem,
   Modal,
-  Platform,
   Pressable,
   Text,
   TextInput,
@@ -17,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Socket } from 'socket.io-client';
 
 import { AttachMenu, UploadQueue, useChatUploads } from '@/components/chat/chat-uploads';
+import { KeyboardPaddingView } from '@/components/ui/keyboard-avoiding-view';
 import { useFileViewer, type ViewableFile } from '@/components/files/file-viewer';
 import { useGroupManagement } from '@/components/groups/group-manage';
 import { AttachmentsSheet } from '@/components/tasks/chat-attachments';
@@ -24,7 +23,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { DotLoader } from '@/components/ui/dot-loader';
 import { DropdownMenu } from '@/components/ui/dropdown-menu';
 import { useAppSelector } from '@/hooks/use-redux';
-import { formatDisplayDate, formatTime, isSameUkDay } from '@/lib/date';
+import { formatDisplayDate, formatTime, isSameUkDay, isSameUkMinute } from '@/lib/date';
+import { setActiveChat } from '@/lib/device-notifications';
 import {
   editGroupMessage,
   fetchGroup,
@@ -151,6 +151,14 @@ export default function GroupChatScreen() {
       if (returning.current) loadGroup();
       returning.current = true;
     }, [loadGroup])
+  );
+
+  // While this chat is on screen, don't alert for it in the phone's tray.
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChat(groupId);
+      return () => setActiveChat(null);
+    }, [groupId])
   );
 
   const appendMessage = useCallback(
@@ -382,12 +390,21 @@ export default function GroupChatScreen() {
       const mine = messageAuthorId(item) === me;
       const older = data[index + 1];
       const showName = !mine && (!older || messageAuthorId(older) !== messageAuthorId(item));
+      // One time under a run of messages from the same person in the same minute (on the last one).
+      const newer = data[index - 1];
+      const showTime =
+        !!item.pending ||
+        !newer ||
+        !!newer.pending ||
+        messageAuthorId(newer) !== messageAuthorId(item) ||
+        !isSameUkMinute(newer.createdAt, item.createdAt);
       const reply = typeof item.replyTo === 'string' ? byId.get(item.replyTo) : item.replyTo ?? undefined;
       return (
         <MessageBubble
           message={item}
           mine={mine}
           showName={showName}
+          showTime={showTime}
           reply={item.replyTo ? reply ?? null : undefined}
           members={members}
           onLongPress={setActionFor}
@@ -402,11 +419,8 @@ export default function GroupChatScreen() {
   const openInfo = () => router.push(`/groups/${groupId}/info` as Href);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-slate-100"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
-    >
+    // The composer already pads for the navigation bar; leave an 8px gap above the keyboard.
+    <KeyboardPaddingView className="flex-1 bg-slate-100" bottomInset={Math.max(insets.bottom, 8) - 8}>
       {/* Header */}
       <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <Pressable
@@ -434,7 +448,7 @@ export default function GroupChatScreen() {
             label="Group options"
             items={[
               { label: 'Group info', onPress: openInfo },
-              { label: 'Media, links and docs', onPress: () => setMediaOpen(true) },
+              { label: 'Media and docs', onPress: () => setMediaOpen(true) },
               { label: isAdmin ? 'Manage members' : 'View members', onPress: manage.openMembers },
               { label: 'Add members', onPress: manage.openAddMembers, hidden: !isAdmin },
               { label: 'Group settings', onPress: manage.openSettings, hidden: !isAdmin },
@@ -545,10 +559,14 @@ export default function GroupChatScreen() {
               <TextInput
                 value={text}
                 onChangeText={onChangeText}
-                placeholder="Type a message… (@ to mention)"
+                placeholder="Type a message…"
                 placeholderTextColor="#64748b"
                 multiline
-                className="max-h-32 min-h-11 flex-1 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[15px] text-black"
+                className="max-h-32 min-h-11 flex-1 rounded-3xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-black"
+                // One line fits inside min-h-11 (44px), the same height as the round buttons on either side.
+                style={{ paddingTop: 11, paddingBottom: 11, includeFontPadding: false }}
+                textAlignVertical="center"
+                maxFontSizeMultiplier={1.2}
                 accessibilityLabel="Message"
               />
               <Pressable
@@ -582,7 +600,7 @@ export default function GroupChatScreen() {
       {fileViewer}
       <AttachMenu visible={attachOpen} onClose={() => setAttachOpen(false)} onPicked={uploads.add} />
       <AttachmentsSheet visible={mediaOpen} files={files} subtitle={group?.groupName} onClose={() => setMediaOpen(false)} />
-    </KeyboardAvoidingView>
+    </KeyboardPaddingView>
   );
 }
 
@@ -616,6 +634,7 @@ const MessageBubble = memo(function MessageBubble({
   message,
   mine,
   showName,
+  showTime,
   reply,
   members,
   onLongPress,
@@ -624,6 +643,7 @@ const MessageBubble = memo(function MessageBubble({
   message: GroupMessage;
   mine: boolean;
   showName: boolean;
+  showTime: boolean;
   /** undefined = not a reply; null = reply to a message that isn't loaded. */
   reply?: GroupMessage | null;
   members: GroupMember[];
@@ -668,7 +688,9 @@ const MessageBubble = memo(function MessageBubble({
           <MentionText content={message.content} mentioned={mentionedNames} mine={mine} />
         )}
       </Pressable>
-      <Text className="mx-1 text-[10px] font-medium text-black">{message.pending ? 'Sending…' : formatMessageTime(message.createdAt)}</Text>
+      {showTime ? (
+        <Text className="mx-1 text-[10px] font-medium text-black">{message.pending ? 'Sending…' : formatMessageTime(message.createdAt)}</Text>
+      ) : null}
     </View>
   );
 });
@@ -703,18 +725,32 @@ function MessageActions({
           </Text>
           {canReply ? <ActionRow icon={ICONS.reply} label="Reply" onPress={() => onReply(message)} /> : null}
           {canEdit ? <ActionRow icon={ICONS.edit} label="Edit" onPress={() => onEdit(message)} /> : null}
-          <ActionRow icon={ICONS.close} label="Cancel" onPress={onClose} />
+          <ActionRow icon={ICONS.close} label="Cancel" onPress={onClose} dark />
         </View>
       </Pressable>
     </Modal>
   );
 }
 
-function ActionRow({ icon, label, onPress }: { icon: (typeof ICONS)[keyof typeof ICONS]; label: string; onPress: () => void }) {
+function ActionRow({
+  icon,
+  label,
+  onPress,
+  dark = false,
+}: {
+  icon: (typeof ICONS)[keyof typeof ICONS];
+  label: string;
+  onPress: () => void;
+  dark?: boolean;
+}) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" className="flex-row items-center gap-3 border-t border-slate-100 px-4 py-3.5 active:bg-slate-50">
-      <SymbolView name={icon} size={18} tintColor="#000000" />
-      <Text className="text-[15px] text-black">{label}</Text>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className={`flex-row items-center gap-3 px-4 py-3.5 ${dark ? 'bg-black active:opacity-90' : 'border-t border-slate-100 active:bg-slate-50'}`}
+    >
+      <SymbolView name={icon} size={18} tintColor={dark ? '#ffffff' : '#000000'} />
+      <Text className={`text-[15px] ${dark ? 'font-bold text-white' : 'text-black'}`}>{label}</Text>
     </Pressable>
   );
 }

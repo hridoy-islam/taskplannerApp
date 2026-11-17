@@ -10,6 +10,7 @@ import { NotificationDialog } from '@/components/notifications/notification-dial
 import { AddByEmailSheet } from '@/components/staff/staff-sheets';
 import { ALL_NAV_ITEMS } from '@/constants/navigation';
 import { useAppDispatch, useAppSelector } from '@/hooks/use-redux';
+import { useDeviceNotificationTaps } from '@/lib/device-notifications';
 import { type AppNotification, notificationHref } from '@/lib/notifications';
 import { isCompanyDirector } from '@/lib/staff';
 import { NotificationsProvider, useNotifications } from '@/providers/notifications-provider';
@@ -37,6 +38,16 @@ export default function PrivateLayout() {
     return <Redirect href="/(public)/login" />;
   }
 
+  // Same gates as the website's ProtectedRoute: verify the email first, then complete the profile.
+  // Only an explicit `false` counts — Google sign-in tokens don't carry these fields at all, and those
+  // users must not be locked out.
+  if (user.isValided === false) {
+    return <Redirect href="/(onboarding)/verify-email" />;
+  }
+  if (user.authorized === false) {
+    return <Redirect href="/(onboarding)/personal-details" />;
+  }
+
   return (
     <NotificationsProvider>
       <PrivateShell />
@@ -62,6 +73,9 @@ function PrivateShell() {
     const href = notificationHref(n);
     if (href) router.push(href);
   };
+
+  // Tapping a notification in the phone's tray opens it the same way as from the bell.
+  useDeviceNotificationTaps(openNotification);
 
   const viewAllNotifications = () => {
     setNotificationsOpen(false);

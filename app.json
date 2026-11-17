@@ -56,7 +56,9 @@
           "microphonePermission": false
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      ["expo-notifications", { "color": "#00214c", "sounds": ["./assets/sounds/notification.mp3"] }],
+      "./plugins/with-apk-name"
     ],
     "experiments": {
       "typedRoutes": true,

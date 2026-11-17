@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Dimensions, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -80,9 +80,23 @@ export function AttachmentsSheet({ visible, files, subtitle, onClose }: Attachme
   const tileSize = Math.floor((width - GRID_GAP * 2) / 3);
 
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      // Cover the Android nav-bar strip too, otherwise the chat composer behind shows through there.
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       {visible ? (
-        <Animated.View entering={SlideInRight.duration(240)} className="flex-1 bg-white">
+        // Explicit full-screen size: on Android the translucent modal root comes out shorter than the
+        // display, which let the chat composer behind it show at the bottom.
+        <Animated.View
+          entering={SlideInRight.duration(240)}
+          className="absolute left-0 top-0 bg-white"
+          style={{ width: Dimensions.get('screen').width, height: Dimensions.get('screen').height }}
+        >
           {/* Header */}
           <View className="border-b border-slate-200 bg-white" style={{ paddingTop: insets.top }}>
             <View className="flex-row items-center gap-2 px-2 py-2">

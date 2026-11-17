@@ -1,12 +1,10 @@
 import { Image } from 'expo-image';
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
   type ListRenderItem,
-  Platform,
   Pressable,
   Text,
   TextInput,
@@ -20,9 +18,11 @@ import { useFileViewer, type ViewableFile } from '@/components/files/file-viewer
 import { AttachmentsSheet } from '@/components/tasks/chat-attachments';
 import { getInitials } from '@/components/ui/avatar';
 import { DotLoader } from '@/components/ui/dot-loader';
+import { KeyboardPaddingView } from '@/components/ui/keyboard-avoiding-view';
 import { useAppSelector } from '@/hooks/use-redux';
 import axiosInstance from '@/lib/axios';
-import { formatDisplayDate, formatTime, isSameUkDay } from '@/lib/date';
+import { formatDisplayDate, formatTime, isSameUkDay, isSameUkMinute } from '@/lib/date';
+import { setActiveChat } from '@/lib/device-notifications';
 import { connectSocket } from '@/lib/socket';
 import {
   type Comment,
@@ -98,6 +98,14 @@ export default function TaskChatScreen() {
       if (me && messageId && !messageId.startsWith('local-')) markCommentsRead(taskId, me, messageId).catch(() => {});
     },
     [taskId, me]
+  );
+
+  // While this chat is on screen, don't alert for it in the phone's tray.
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChat(taskId);
+      return () => setActiveChat(null);
+    }, [taskId])
   );
 
   // Initial load: task header + history.
@@ -271,7 +279,17 @@ export default function TaskChatScreen() {
       // In the inverted list the "previous" message (older) is at index + 1.
       const older = data[index + 1];
       const showName = !mine && (!older || refId(older.authorId) !== refId(item.authorId));
-      return <MessageBubble comment={item} mine={mine} showName={showName} onEdit={startEdit} onOpenFile={openFile} />;
+      // One time under a run of messages from the same person in the same minute (on the last one).
+      const newer = data[index - 1];
+      const showTime =
+        !!item.pending ||
+        !newer ||
+        !!newer.pending ||
+        refId(newer.authorId) !== refId(item.authorId) ||
+        !isSameUkMinute(newer.createdAt, item.createdAt);
+      return (
+        <MessageBubble comment={item} mine={mine} showName={showName} showTime={showTime} onEdit={startEdit} onOpenFile={openFile} />
+      );
     },
     [me, data, startEdit, openFile]
   );
@@ -284,11 +302,8 @@ export default function TaskChatScreen() {
   const otherName = refName(other) ?? 'Chat';
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-slate-100"
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}
-    >
+    // The composer already pads for the navigation bar; leave an 8px gap above the keyboard.
+    <KeyboardPaddingView className="flex-1 bg-slate-100" bottomInset={Math.max(insets.bottom, 8) - 8}>
       {/* Header */}
       <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
         <Pressable
@@ -403,7 +418,11 @@ export default function TaskChatScreen() {
             placeholder="Type a message…"
             placeholderTextColor="#64748b"
             multiline
-            className="max-h-32 min-h-11 flex-1 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[15px] text-black"
+            className="max-h-32 min-h-11 flex-1 rounded-3xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-black"
+            // One line fits inside min-h-11 (44px), the same height as the round buttons on either side.
+            style={{ paddingTop: 11, paddingBottom: 11, includeFontPadding: false }}
+            textAlignVertical="center"
+            maxFontSizeMultiplier={1.2}
             accessibilityLabel="Message"
           />
           <Pressable
@@ -421,7 +440,7 @@ export default function TaskChatScreen() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardPaddingView>
   );
 }
 
@@ -429,12 +448,14 @@ const MessageBubble = memo(function MessageBubble({
   comment,
   mine,
   showName,
+  showTime,
   onEdit,
   onOpenFile,
 }: {
   comment: Comment;
   mine: boolean;
   showName: boolean;
+  showTime: boolean;
   onEdit: (c: Comment) => void;
   onOpenFile: (f: ViewableFile) => void;
 }) {
@@ -466,7 +487,9 @@ const MessageBubble = memo(function MessageBubble({
           <Text className={`text-[15px] leading-[21px] ${mine ? 'text-white' : 'text-black'}`}>{comment.content}</Text>
         )}
       </Pressable>
-      <Text className="mx-1 text-[10px] font-medium text-black">{comment.pending ? 'Sending…' : formatMessageTime(comment.createdAt)}</Text>
+      {showTime ? (
+        <Text className="mx-1 text-[10px] font-medium text-black">{comment.pending ? 'Sending…' : formatMessageTime(comment.createdAt)}</Text>
+      ) : null}
     </View>
   );
 });

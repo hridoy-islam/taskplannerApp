@@ -2,6 +2,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { AppState } from 'react-native';
 
 import { useAppSelector } from '@/hooks/use-redux';
+import { getVisibleChat, isViewingChatOf, showDeviceNotification, subscribeActiveChat } from '@/lib/device-notifications';
 import {
   type AppNotification,
   fetchNotifications,
@@ -76,15 +77,32 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const socket = connectSocket({ _id: userId, name: userName });
     const onNotification = (n: AppNotification) => {
       if (!n?._id) return;
-      const item = { ...n, isRead: !!n.isRead, createdAt: n.createdAt ?? new Date().toISOString() };
+      // Already looking at that task chat / group: no tray alert, no unread badge — treat it as read.
+      const viewing = !n.isRead && isViewingChatOf(n);
+      if (viewing) markNotificationRead(n._id).catch(() => {});
+      const item = { ...n, isRead: !!n.isRead || viewing, createdAt: n.createdAt ?? new Date().toISOString() };
       setLatest((prev) => [item, ...prev.filter((p) => p._id !== item._id)].slice(0, PREVIEW_COUNT));
       setIncoming((prev) => [item, ...prev.filter((p) => p._id !== item._id)]);
-      if (!item.isRead) setUnreadCount((c) => c + 1);
+      if (!item.isRead) {
+        setUnreadCount((c) => c + 1);
+        // Also show it in the phone's notification tray.
+        showDeviceNotification(item);
+      }
       setVersion((v) => v + 1);
     };
     socket.on('notification', onNotification);
+
+    // Tell the server which chat is open (null when none / app in background), so it doesn't create
+    // notifications for messages the user is already reading. Re-sent after every reconnect.
+    const sendViewingChat = () => socket.emit('viewing chat', getVisibleChat());
+    socket.on('connect', sendViewingChat);
+    const unsubscribeChat = subscribeActiveChat(sendViewingChat);
+    const appStateSub = AppState.addEventListener('change', sendViewingChat);
+
     return () => {
       socket.off('notification', onNotification);
+      unsubscribeChat();
+      appStateSub.remove();
       socket.disconnect();
     };
   }, [userId, userName]);

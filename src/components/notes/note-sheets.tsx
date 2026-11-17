@@ -59,7 +59,7 @@ function NoteTitleSheetContent({ visible, mode, initial = '', onClose, onSubmit 
       onClose={submitting ? () => {} : onClose}
       footer={
         <View className="flex-row gap-3">
-          <Button title="Cancel" variant="outline" onPress={onClose} disabled={submitting} className="h-12 flex-1 rounded-xl py-0" />
+          <Button title="Cancel" variant="dark" onPress={onClose} disabled={submitting} className="h-12 flex-1 rounded-xl py-0" />
           <Button
             title={mode === 'create' ? 'Create Note' : 'Save'}
             onPress={submit}
@@ -373,7 +373,7 @@ function LinkSheetContent({ visible, onClose, onInsert }: LinkSheetProps) {
       onClose={onClose}
       footer={
         <View className="flex-row gap-3">
-          <Button title="Cancel" variant="outline" onPress={onClose} className="h-12 flex-1 rounded-xl py-0" />
+          <Button title="Cancel" variant="dark" onPress={onClose} className="h-12 flex-1 rounded-xl py-0" />
           <Button title="Insert" onPress={insert} className="h-12 flex-1 rounded-xl py-0" />
         </View>
       }

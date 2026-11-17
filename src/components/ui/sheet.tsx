@@ -1,7 +1,9 @@
 import { SymbolView } from 'expo-symbols';
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { KeyboardPaddingView } from '@/components/ui/keyboard-avoiding-view';
 
 /** Slide-up bottom sheet with a title row, close button and optional footer. */
 export function Sheet({
@@ -22,7 +24,7 @@ export function Sheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 justify-end bg-black/40">
+      <KeyboardPaddingView bottomInset={Math.max(insets.bottom, 12) - 12} className="flex-1 justify-end bg-black/40">
         <Pressable className="absolute inset-0" onPress={onClose} accessibilityLabel="Close" />
         <View className="max-h-[85%] rounded-t-3xl bg-white" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <View className="items-center pt-2.5">
@@ -46,7 +48,7 @@ export function Sheet({
           {children}
           {footer ? <View className="px-5 pt-3">{footer}</View> : null}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardPaddingView>
     </Modal>
   );
 }

@@ -63,7 +63,9 @@ export function NotificationDialog({
               marginHorizontal: SIDE_MARGIN,
             }}
           >
-            <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg shadow-black/15">
+            {/* Shadow on iOS only: Android draws `elevation` shadows as boxes, which made the pointer
+                below show up as a grey rectangle. The dimmed backdrop separates the card on Android. */}
+            <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white ios:shadow-lg ios:shadow-black/15">
               {/* Header */}
               <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-3">
                 <Text className="text-base font-semibold text-black">
@@ -137,7 +139,6 @@ export function NotificationDialog({
                 top: -POINTER / 2 + 1,
                 right: BELL_CENTER_FROM_RIGHT - SIDE_MARGIN - POINTER / 2,
                 zIndex: 10,
-                elevation: 12,
               }}
             />
           </Animated.View>
