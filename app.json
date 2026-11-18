@@ -44,7 +44,10 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "buildArchs": ["armeabi-v7a", "arm64-v8a"]
           }
         }
       ],
@@ -57,7 +60,7 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      ["expo-notifications", { "color": "#00214c", "sounds": ["./assets/sounds/notification.mp3"] }],
+      ["expo-notifications", { "color": "#00214c" }],
       "./plugins/with-apk-name"
     ],
     "experiments": {

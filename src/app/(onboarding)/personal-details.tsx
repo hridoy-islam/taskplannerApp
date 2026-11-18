@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, type TextInputProps, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, TextInput, type TextInputProps, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OnboardingLogoutButton } from '@/components/onboarding/logout-button';
@@ -92,6 +92,8 @@ type Step = {
   description: string;
   /** Can the user move on from this step? */
   done: (f: Form) => boolean;
+  /** Shown when Next is tapped before the step is done. */
+  required?: string;
   /** Steps that only apply when employed. */
   when?: (f: Form) => boolean;
 };
@@ -100,8 +102,8 @@ const filled = (s: string) => s.trim() !== '';
 
 const STEPS: Step[] = [
   { id: 'photo', section: 'profile', title: "Let's start with your profile picture", description: 'A professional photo helps others recognise you', done: () => true },
-  { id: 'jobTitle', section: 'profile', title: 'What is your job title?', description: 'Let others know what you do professionally', done: (f) => filled(f.jobTitle) },
-  { id: 'bio', section: 'profile', title: 'Tell us a bit about yourself', description: 'Share your background, expertise, or interests', done: (f) => filled(f.bio) },
+  { id: 'jobTitle', section: 'profile', title: 'What is your job title?', description: 'Let others know what you do professionally', done: (f) => filled(f.jobTitle), required: 'Please enter your job title' },
+  { id: 'bio', section: 'profile', title: 'Tell us a bit about yourself', description: 'Share your background, expertise, or interests', done: (f) => filled(f.bio), required: 'Please write a short bio' },
   { id: 'socialLinks', section: 'profile', title: 'Any social profiles you want to share?', description: 'Connect with others through your social media', done: () => true },
   { id: 'isEmployed', section: 'company', title: 'Are you currently employed?', description: 'Let us know about your employment status', done: () => true },
   {
@@ -110,6 +112,7 @@ const STEPS: Step[] = [
     title: 'Tell us about your company',
     description: 'Share the basic details about your workplace',
     done: (f) => filled(f.companyType) && filled(f.companyName),
+    required: 'Please choose a company type and enter the company name',
     when: (f) => f.isEmployed,
   },
   {
@@ -120,9 +123,9 @@ const STEPS: Step[] = [
     done: () => true,
     when: (f) => f.isEmployed,
   },
-  { id: 'howDidYouHear', section: 'additional', title: 'How did you hear about us?', description: "We'd love to know how you discovered our platform", done: (f) => filled(f.howDidYouHear) },
-  { id: 'industryType', section: 'additional', title: 'What industry do you work in?', description: 'This helps us tailor our content to your needs', done: (f) => filled(f.industryType) },
-  { id: 'numberOfEmployees', section: 'additional', title: 'How large is your organisation?', description: 'Tell us about the size of your company', done: (f) => filled(f.numberOfEmployees) },
+  { id: 'howDidYouHear', section: 'additional', title: 'How did you hear about us?', description: "We'd love to know how you discovered our platform", done: (f) => filled(f.howDidYouHear), required: 'Please choose an option' },
+  { id: 'industryType', section: 'additional', title: 'What industry do you work in?', description: 'This helps us tailor our content to your needs', done: (f) => filled(f.industryType), required: 'Please choose your industry' },
+  { id: 'numberOfEmployees', section: 'additional', title: 'How large is your organisation?', description: 'Tell us about the size of your company', done: (f) => filled(f.numberOfEmployees), required: 'Please choose your organisation size' },
   { id: 'finish', section: 'additional', title: "You're all set!", description: 'Thank you for completing your profile information', done: () => true },
 ];
 
@@ -159,10 +162,24 @@ export default function PersonalDetailsScreen() {
   const isLast = index === steps.length - 1;
   const sectionIndex = SECTIONS.findIndex((s) => s.id === step.section);
 
-  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => {
+    setError(null);
+    setForm((f) => ({ ...f, [key]: value }));
+  };
   const goTo = (i: number) => {
     setError(null);
     setStepId(steps[Math.min(Math.max(i, 0), steps.length - 1)].id);
+  };
+
+  // Next is always tappable: a disabled button gave no feedback, so taps on an unfinished step
+  // looked like Next "sometimes not working". Now it says what's missing instead.
+  const next = () => {
+    Keyboard.dismiss();
+    if (!step.done(form)) {
+      setError(step.required ?? 'Please complete this step');
+      return;
+    }
+    goTo(index + 1);
   };
 
   const submit = async () => {
@@ -249,7 +266,7 @@ export default function PersonalDetailsScreen() {
           {isLast ? (
             <Button title="Finish" onPress={submit} loading={submitting} disabled={submitting} className="h-12 flex-1 rounded-xl py-0" />
           ) : (
-            <Button title="Next" onPress={() => goTo(index + 1)} disabled={!step.done(form)} className="h-12 flex-1 rounded-xl py-0" />
+            <Button title="Next" onPress={next} className="h-12 flex-1 rounded-xl py-0" />
           )}
         </View>
       </View>

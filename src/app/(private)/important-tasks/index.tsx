@@ -32,6 +32,7 @@ export default function ImportantTasksScreen() {
 
   return (
     <TaskListView
+      cacheKey="important"
       title="Important Task"
       fallbackHref="/home"
       taskHrefBase="/important-tasks/task"

@@ -6,10 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/layout/screen-header';
 import { TaskFormModal, type TaskFormValues } from '@/components/tasks/task-form-modal';
-import { getInitials } from '@/components/ui/avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DotLoader } from '@/components/ui/dot-loader';
 import { EmptyState } from '@/components/ui/empty-state';
+import { type Person, usePersonResolver } from '@/hooks/use-person';
 import { useAppSelector } from '@/hooks/use-redux';
 import { formatDisplayDate, isSameUkDay } from '@/lib/date';
 import {
@@ -18,7 +19,6 @@ import {
   markTaskSeen,
   reassignTask,
   refId,
-  refName,
   type TaskDetail,
   updateTask,
 } from '@/lib/tasks';
@@ -48,6 +48,7 @@ export default function TaskDetailsScreen() {
   const insets = useSafeAreaInsets();
   const user = useAppSelector((state) => state.auth.user) as { _id: string; name?: string } | null;
   const me = user?._id;
+  const person = usePersonResolver();
 
   // Unread chat messages: the count from the list (or the task), plus any that arrive while this
   // screen is open. Opening the chat marks them read, so it resets to 0.
@@ -278,9 +279,9 @@ export default function TaskDetailsScreen() {
           </View>
           <View className="h-px bg-slate-200" />
           <View className="flex-row">
-            <PersonCell label="Created By" name={refName(task.author)} />
+            <PersonCell label="Created By" person={person(task.author)} />
             <Divider />
-            <PersonCell label="Assigned To" name={refName(task.assigned)} />
+            <PersonCell label="Assigned To" person={person(task.assigned)} />
             <Divider />
             <InfoCell label="Frequency" value={task.frequency ? task.frequency[0].toUpperCase() + task.frequency.slice(1) : 'Once'} />
           </View>
@@ -389,14 +390,13 @@ function InfoCell({ label, value, valueClassName = 'text-black' }: { label: stri
   );
 }
 
-function PersonCell({ label, name }: { label: string; name?: string }) {
+function PersonCell({ label, person }: { label: string; person?: Person }) {
+  const name = person?.name;
   return (
     <View className="flex-1 gap-1 p-3">
       <Text className="text-[11px] font-semibold uppercase tracking-wider text-black">{label}</Text>
       <View className="flex-row items-center gap-1.5">
-        <View className="h-5 w-5 items-center justify-center rounded-full bg-primary">
-          <Text className="text-[8px] font-bold text-white">{getInitials(name)}</Text>
-        </View>
+        <Avatar name={name} uri={person?.image} size={20} />
         <Text className="flex-1 text-sm font-bold text-black" numberOfLines={1}>
           {name ?? '—'}
         </Text>

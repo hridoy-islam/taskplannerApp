@@ -4,11 +4,11 @@ import { AppState, Platform } from 'react-native';
 
 import { type AppNotification, senderName } from './notifications';
 
-// Android fixes a channel's sound when the channel is first created, so a new sound needs a new
-// channel id (the old "default" channel had the system sound).
-const CHANNEL_ID = 'alerts';
-/** assets/sounds/notification.mp3, bundled by the expo-notifications plugin (see app.json). */
-const SOUND = 'notification.mp3';
+// Android fixes a channel's sound when the channel is first created, so changing the sound needs a
+// new channel id. Earlier channels ("default", "alerts" with a custom mp3, "messages" with a broken
+// sound setting) are removed below.
+const CHANNEL_ID = 'notifications';
+const OLD_CHANNEL_IDS = ['default', 'alerts', 'messages'];
 
 // Show notifications in the phone's tray / as a banner even while the app is open.
 Notifications.setNotificationHandler({
@@ -23,12 +23,13 @@ Notifications.setNotificationHandler({
 /** Android 8+ needs a channel before anything can be shown; high importance = heads-up banner. */
 async function ensureChannel() {
   if (Platform.OS !== 'android') return;
-  // Remove the earlier channel (system sound) so only the current one shows in the phone's settings.
-  await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
+  // Remove earlier channels so only the current one shows in the phone's settings.
+  await Promise.all(OLD_CHANNEL_IDS.map((id) => Notifications.deleteNotificationChannelAsync(id).catch(() => {})));
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Notifications',
     importance: Notifications.AndroidImportance.HIGH,
-    sound: SOUND,
+    // No `sound` key: a channel without one uses the phone's own notification sound.
+    // (Any string here, even 'default', is treated as a custom sound file name.)
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#00214c',
   });
@@ -141,7 +142,8 @@ export async function showDeviceNotification(n: AppNotification) {
         title,
         body,
         data: { notification: n },
-        sound: SOUND,
+        // true = the phone's own notification sound (whatever the user picked in system settings).
+        sound: true,
       },
       // null = show now.
       trigger: Platform.OS === 'android' ? { channelId: CHANNEL_ID } : null,

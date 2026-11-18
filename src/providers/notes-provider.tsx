@@ -21,7 +21,8 @@ type NotesContextValue = {
   loading: boolean;
   refresh: () => Promise<void>;
   /** Creates a note and resolves with it (for opening the editor). */
-  addNote: (title: string) => Promise<Note | null>;
+  /** ok = the note was created; note = it, when the server returned its id (so it can be opened). */
+  addNote: (title: string) => Promise<{ ok: boolean; note: Note | null }>;
   /** Optimistic PATCH; rolls back to the server state on failure. */
   updateNoteApi: (noteId: string, data: Partial<Note>) => Promise<boolean>;
   removeNote: (noteId: string) => Promise<void>;
@@ -82,14 +83,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   const addNote = useCallback(
     async (title: string) => {
-      if (!me) return null;
+      if (!me) return { ok: false, note: null };
       try {
         const server = await createNote(title, me);
         if (!server._id) {
           // Created, but the response had no id to open: just reload the list.
           toast.success('Note created');
           refresh();
-          return null;
+          return { ok: true, note: null };
         }
         const now = new Date().toISOString();
         const note: Note = {
@@ -109,10 +110,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setNotes((prev) => [note, ...prev.filter((n) => n._id !== note._id)]);
         toast.success('Note created');
         refresh();
-        return note;
+        return { ok: true, note };
       } catch (e) {
         toastError(e, 'Failed to create note');
-        return null;
+        return { ok: false, note: null };
       }
     },
     [me, userName, userEmail, refresh]

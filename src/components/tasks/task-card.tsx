@@ -2,10 +2,11 @@ import { type SymbolViewProps, SymbolView } from 'expo-symbols';
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { getInitials } from '@/components/ui/avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { formatDisplayDate, ukMoment } from '@/lib/date';
-import { isCompletedBy, refId, refName, type Task, type TaskActions } from '@/lib/tasks';
+import { usePersonResolver } from '@/hooks/use-person';
+import { isCompletedBy, refId, type Task, type TaskActions } from '@/lib/tasks';
 
 /* ------------------------------------------------------------------ */
 /* Styling tables (static, so nothing is rebuilt per render)           */
@@ -71,6 +72,7 @@ function TaskCardBase({
   onOpen,
   onOpenChat,
 }: TaskCardProps) {
+  const person = usePersonResolver();
   const authorId = refId(task.author);
   const assigneeId = refId(task.assigned);
   const isAuthor = me === authorId;
@@ -101,10 +103,8 @@ function TaskCardBase({
 
   // The other person: "Assigned to" if I wrote it, otherwise "Assigned by" (yourself for personal tasks).
   const assignLabel = isAuthor && authorId !== assigneeId ? 'Assigned to' : 'Assigned by';
-  const assignName =
-    authorId === assigneeId
-      ? 'You'
-      : (isAuthor ? refName(task.assigned) : refName(task.author)) ?? '—';
+  const assignPerson = authorId === assigneeId ? person(task.author) : person(isAuthor ? task.assigned : task.author);
+  const assignName = authorId === assigneeId ? 'You' : (assignPerson?.name ?? '—');
   const important = isImportant ? IMPORTANT_ON : IMPORTANT_OFF;
   // The due date itself still turns red when overdue, amber when due today.
   const dueTone = isOverdue ? 'danger' : isDueToday ? 'warning' : 'default';
@@ -138,9 +138,7 @@ function TaskCardBase({
               {assignLabel}
             </Text>
             <View className="flex-row items-center gap-1.5">
-              <View className="h-5 w-5 items-center justify-center rounded-full bg-primary">
-                <Text className="text-[8px] font-bold text-white">{getInitials(assignName)}</Text>
-              </View>
+              <Avatar name={assignPerson?.name ?? assignName} uri={assignPerson?.image} size={20} />
               <Text className="flex-1 text-xs font-bold text-black" numberOfLines={1}>
                 {assignName}
               </Text>

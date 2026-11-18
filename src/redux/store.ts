@@ -7,16 +7,20 @@ import { setStore } from '@/lib/store-ref';
 import authReducer from './features/authSlice';
 import colleaguesReducer from './features/colleaguesSlice';
 import profileReducer from './features/profileSlice';
+import tasksReducer from './features/tasksSlice';
 
 const persistConfig = {
   key: 'watney',
   storage: AsyncStorage,
+  // Task data is a session cache: it's refreshed on every visit, so don't write it to disk.
+  blacklist: ['tasks'],
 };
 
 const rootReducer = combineReducers({
   auth: authReducer,
   profile: profileReducer,
   colleagues: colleaguesReducer,
+  tasks: tasksReducer,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

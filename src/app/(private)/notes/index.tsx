@@ -4,6 +4,7 @@ import moment from 'moment';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 
+import { MODAL_SWAP_DELAY } from '@/components/groups/group-manage';
 import { ManageTagsSheet, NoteTitleSheet } from '@/components/notes/note-sheets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAppSelector } from '@/hooks/use-redux';
@@ -94,9 +95,14 @@ export default function NotesScreen() {
   const open = useCallback((note: Note) => router.push(`/notes/${note._id}` as Href), [router]);
 
   const onCreate = async (title: string) => {
-    const note = await addNote(title);
-    if (note) open(note);
-    return !!note;
+    const { ok, note } = await addNote(title);
+    // Only a failed request keeps the sheet open (so it can be retried).
+    if (!ok) return false;
+    // Close the sheet before opening the note, so it never stays on top of the next page
+    // (iOS can't navigate cleanly while a modal is still presented).
+    setCreateOpen(false);
+    if (note) setTimeout(() => open(note), MODAL_SWAP_DELAY);
+    return true;
   };
 
   const onRefresh = async () => {

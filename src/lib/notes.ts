@@ -45,9 +45,13 @@ export async function fetchNotesAndTags(userId: string) {
 
 export async function createNote(title: string, author: string): Promise<Partial<Note>> {
   const res = await axiosInstance.post('/notes', { title, content: '', tags: [], author });
-  let data = res.data?.data?.result ?? res.data?.data;
-  if (Array.isArray(data)) data = data[0];
-  return data ?? {};
+  // The created note can come back under a few different shapes; use the first one with an id.
+  const candidates = [res.data?.data?.result, res.data?.data, res.data?.result, res.data?.note, res.data];
+  for (let c of candidates) {
+    if (Array.isArray(c)) c = c[0];
+    if (c && typeof c === 'object' && c._id) return c;
+  }
+  return {};
 }
 
 /** PATCH a note. Tags are sent as ids (the API stores references). */

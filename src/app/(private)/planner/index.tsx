@@ -8,9 +8,9 @@ import { Avatar } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Brand } from '@/constants/theme';
 import { useAppSelector } from '@/hooks/use-redux';
-import { resolveImageUrl } from '@/lib/image-url';
 import { ukMoment, ukNow } from '@/lib/date';
-import { fetchPlannerTasks, refName, type Task } from '@/lib/tasks';
+import { type Person, usePersonResolver } from '@/hooks/use-person';
+import { fetchPlannerTasks, type Ref, refId, type Task } from '@/lib/tasks';
 import { toastError } from '@/lib/toast';
 
 const ONE_MINUTE = 60_000;
@@ -25,8 +25,8 @@ type Icon = SymbolViewProps['name'];
 const ICONS = {
   prev: { ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' },
   next: { ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' },
-  clock: { ios: 'clock', android: 'schedule', web: 'schedule' },
   repeat: { ios: 'repeat', android: 'repeat', web: 'repeat' },
+  to: { ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' },
   done: { ios: 'checkmark.circle', android: 'task_alt', web: 'task_alt' },
 } satisfies Record<string, Icon>;
 
@@ -44,6 +44,8 @@ const PRIORITY: Record<string, { bar: string; chip: string; text: string; label:
 export default function PlannerScreen() {
   const router = useRouter();
   const me: string | undefined = useAppSelector((state) => state.auth.user?._id);
+  /** Name and photo for a task's author / assignee, even when the API only sent an id. */
+  const person = usePersonResolver();
 
   const [month, setMonth] = useState(() => ukNow().startOf('month'));
   const [selected, setSelected] = useState(() => ukNow().format(DAY_KEY));
@@ -215,12 +217,15 @@ export default function PlannerScreen() {
                   >
                     {day.date()}
                   </Text>
-                </View>
-                <View className="absolute bottom-0.5 h-1 flex-row gap-[3px]">
-                  {!loading &&
-                    Array.from({ length: Math.min(count, 3) }, (_, d) => (
-                      <View key={d} className={`h-1 w-1 rounded-full ${isPast ? 'bg-slate-300' : 'bg-blue-600'}`} />
-                    ))}
+                  {/* One dot when the day has any tasks; white on the selected (filled) day so it stays visible. */}
+                  {!loading && count > 0 ? (
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: isSelected ? '#ffffff' : isPast ? '#cbd5e1' : '#2563eb' },
+                      ]}
+                    />
+                  ) : null}
                 </View>
               </Pressable>
             );
@@ -257,7 +262,7 @@ export default function PlannerScreen() {
             <Text className="text-center text-[13px] text-black">You have no pending tasks on this day.</Text>
           </View>
         ) : (
-          selectedTasks.map((task) => <AgendaCard key={task._id} task={task} me={me} onPress={openTask} />)
+          selectedTasks.map((task) => <AgendaCard key={task._id} task={task} me={me} person={person} onPress={openTask} />)
         )}
       </View>
     </ScrollView>
@@ -277,14 +282,23 @@ function MonthArrow({ icon, label, onPress }: { icon: Icon; label: string; onPre
   );
 }
 
-/** Agenda row: priority bar, title, author, due time, priority/repeat chips; important tasks get an amber background. */
-function AgendaCard({ task, me, onPress }: { task: Task; me?: string; onPress: (t: Task) => void }) {
+/** Agenda row: priority bar, title, created by / assigned to, priority/repeat chips; important tasks get an amber background. */
+function AgendaCard({
+  task,
+  me,
+  person,
+  onPress,
+}: {
+  task: Task;
+  me?: string;
+  person: (ref: Ref) => Person | undefined;
+  onPress: (t: Task) => void;
+}) {
   const important = !!me && (task.importantBy ?? []).includes(me);
   const priority = PRIORITY[task.priority?.toLowerCase() ?? ''];
-  const author = refName(task.author);
-  const authorImage = typeof task.author === 'object' ? resolveImageUrl(task.author?.image) : undefined;
-  const time = ukMoment(task.dueDate)?.format('h:mm A');
-  const showTime = !!time && time !== '12:00 AM';
+  const author = person(task.author);
+  // Self tasks: show the name once.
+  const assignee = refId(task.assigned) === refId(task.author) ? undefined : person(task.assigned);
   const recurring = !!task.frequency && task.frequency !== 'once';
 
   return (
@@ -303,18 +317,19 @@ function AgendaCard({ task, me, onPress }: { task: Task; me?: string; onPress: (
           {task.taskName}
         </Text>
 
-        <View className="flex-row flex-wrap items-center gap-2">
-          {author ? (
-            <View className="mr-1 flex-row items-center gap-1.5">
-              <Avatar name={author} uri={authorImage} size={20} />
-              <Text className="text-xs text-black" numberOfLines={1}>
-                {author}
-              </Text>
-            </View>
-          ) : null}
-          {showTime ? (
-            <Chip icon={ICONS.clock} label={time} className="bg-slate-100" textClassName="text-black" />
-          ) : null}
+        {/* One line: creator → assignee on the left, priority / repeat chips on the right. */}
+        <View className="flex-row items-center gap-2">
+          <View
+            className="flex-1 flex-row items-center gap-1.5"
+            accessible
+            accessibilityLabel={[author && `Created by ${author.name}`, assignee && `assigned to ${assignee.name}`]
+              .filter(Boolean)
+              .join(', ')}
+          >
+            {author ? <PersonName person={author} /> : null}
+            {author && assignee ? <SymbolView name={ICONS.to} size={11} tintColor="#64748b" /> : null}
+            {assignee ? <PersonName person={assignee} /> : null}
+          </View>
           {priority ? <Chip label={priority.label} className={priority.chip} textClassName={priority.text} /> : null}
           {recurring ? (
             <Chip icon={ICONS.repeat} label={capitalise(task.frequency!)} className="bg-indigo-50" textClassName="text-indigo-700" />
@@ -326,6 +341,18 @@ function AgendaCard({ task, me, onPress }: { task: Task; me?: string; onPress: (
         <SymbolView name={ICONS.next} size={14} tintColor="#000000" />
       </View>
     </Pressable>
+  );
+}
+
+/** Small avatar + name that shrinks (with "…") so the whole row stays on one line. */
+function PersonName({ person }: { person: Person }) {
+  return (
+    <View className="flex-shrink flex-row items-center gap-1">
+      <Avatar name={person.name} uri={person.image} size={18} />
+      <Text className="flex-shrink text-xs font-semibold text-black" numberOfLines={1}>
+        {person.name}
+      </Text>
+    </View>
   );
 }
 
@@ -367,5 +394,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   daySelected: { backgroundColor: Brand.primary },
+  /** Task marker inside the day circle, under the number. */
+  dot: { position: 'absolute', bottom: 4, width: 5, height: 5, borderRadius: 2.5 },
   dayToday: { backgroundColor: '#eff6ff' },
 });

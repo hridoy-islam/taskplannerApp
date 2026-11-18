@@ -1,6 +1,6 @@
 import axiosInstance from './axios';
 
-type Ref = string | { _id: string; name?: string; image?: string } | null | undefined;
+export type Ref = string | { _id: string; name?: string; image?: string } | null | undefined;
 
 export type Task = {
   _id: string;

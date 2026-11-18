@@ -4,7 +4,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -19,7 +18,7 @@ import { ScreenHeader } from "@/components/layout/screen-header";
 import { TaskCard } from "@/components/tasks/task-card";
 import { DotLoader } from "@/components/ui/dot-loader";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useAppSelector } from "@/hooks/use-redux";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-redux";
 import {
   completeTask,
   isCompletedBy,
@@ -30,8 +29,19 @@ import {
   type TaskActions,
 } from "@/lib/tasks";
 import { getErrorMessage, toast, toastError } from "@/lib/toast";
+import {
+  type CachedTaskList,
+  patchTask,
+  removeTaskFromList,
+  setListPage,
+} from "@/redux/features/tasksSlice";
 
 type TaskListViewProps = {
+  /**
+   * Unique key for this list in the Redux task cache (e.g. "dashboard:today").
+   * Revisiting the list shows the cached tasks instantly while it refreshes in the background.
+   */
+  cacheKey: string;
   title: string;
   fallbackHref: Href;
   /** Loads one page of tasks. Change its identity to reload from page 1. */
@@ -56,9 +66,11 @@ type TaskListViewProps = {
 };
 
 const keyExtractor = (t: Task) => t._id;
+const EMPTY: Task[] = [];
 
 /** Paginated, pull-to-refresh task list in the "Tasklist" design, with complete/finish/reassign/important actions. */
 export function TaskListView({
+  cacheKey,
   title,
   fallbackHref,
   fetchPage,
@@ -78,10 +90,13 @@ export function TaskListView({
     (state) => state.auth.user?._id,
   );
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const cached: CachedTaskList | undefined = useAppSelector(
+    (state) => state.tasks.lists[cacheKey],
+  );
+  const tasks = cached?.tasks ?? EMPTY;
+  const page = cached?.page ?? 1;
+  const hasMore = cached?.hasMore ?? true;
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,30 +108,28 @@ export function TaskListView({
       fetchPage(pageNum)
         .then((fetched) => {
           setError(null);
-          setHasMore(fetched.length >= pageSize);
-          setPage(pageNum);
-          setTasks((prev) => {
-            const merged = pageNum === 1 ? fetched : [...prev, ...fetched];
-            return Array.from(new Map(merged.map((t) => [t._id, t])).values());
-          });
+          dispatch(
+            setListPage({
+              key: cacheKey,
+              page: pageNum,
+              tasks: fetched,
+              hasMore: fetched.length >= pageSize,
+            }),
+          );
         })
         .catch((e: any) => {
           setError(getErrorMessage(e, "Could not load tasks."));
           toastError(e, "Could not load tasks");
         }),
-    [fetchPage, pageSize],
+    [fetchPage, pageSize, cacheKey, dispatch],
   );
 
-  useEffect(() => {
-    load(1).finally(() => setLoading(false));
-  }, [load]);
-
-  // Refresh silently when coming back from task details (it may have been completed or edited there).
-  const returning = useRef(false);
+  // Only the very first visit (nothing cached yet) shows the loader; later visits show the
+  // cached tasks and refresh silently, e.g. after a task was completed or edited in its details.
+  const loading = !cached && !error;
   useFocusEffect(
     useCallback(() => {
-      if (returning.current) load(1);
-      returning.current = true;
+      load(1);
     }, [load]),
   );
 
@@ -161,7 +174,7 @@ export function TaskListView({
       setBusyId(task._id);
       try {
         await completeTask(task, me);
-        setTasks((prev) => prev.filter((t) => t._id !== task._id));
+        dispatch(removeTaskFromList({ key: cacheKey, taskId: task._id }));
         toast.success(
           refId(task.author) === me ? "Task finished" : "Task completed",
         );
@@ -171,7 +184,7 @@ export function TaskListView({
         setBusyId(null);
       }
     },
-    [me],
+    [me, cacheKey, dispatch],
   );
 
   const onReassign = useCallback(async (task: Task) => {
@@ -179,18 +192,16 @@ export function TaskListView({
     try {
       await reassignTask(task._id);
       const assignee = refId(task.assigned);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t._id === task._id
-            ? {
-                ...t,
-                status: "pending",
-                completedBy: (t.completedBy ?? []).filter(
-                  (c) => refId(c?.userId) !== assignee,
-                ),
-              }
-            : t,
-        ),
+      dispatch(
+        patchTask({
+          taskId: task._id,
+          changes: {
+            status: "pending",
+            completedBy: (task.completedBy ?? []).filter(
+              (c) => refId(c?.userId) !== assignee,
+            ),
+          },
+        }),
       );
       toast.success("Task reassigned");
     } catch (e) {
@@ -198,7 +209,7 @@ export function TaskListView({
     } finally {
       setBusyId(null);
     }
-  }, []);
+  }, [dispatch]);
 
   const onToggleImportant = useCallback(
     async (task: Task) => {
@@ -206,30 +217,24 @@ export function TaskListView({
       const important = !task.importantBy?.includes(me);
       const previous = task.importantBy;
       // Optimistic update, rolled back on failure.
-      setTasks((prev) =>
-        prev.map((t) =>
-          t._id === task._id
-            ? {
-                ...t,
-                importantBy: important
-                  ? [...(t.importantBy ?? []), me]
-                  : (t.importantBy ?? []).filter((x) => x !== me),
-              }
-            : t,
-        ),
+      dispatch(
+        patchTask({
+          taskId: task._id,
+          changes: {
+            importantBy: important
+              ? [...(previous ?? []), me]
+              : (previous ?? []).filter((x) => x !== me),
+          },
+        }),
       );
       try {
         await setTaskImportant(task, me, important);
       } catch (e) {
-        setTasks((prev) =>
-          prev.map((t) =>
-            t._id === task._id ? { ...t, importantBy: previous } : t,
-          ),
-        );
+        dispatch(patchTask({ taskId: task._id, changes: { importantBy: previous } }));
         toastError(e, "Failed to update importance");
       }
     },
-    [me],
+    [me, dispatch],
   );
 
   // Hide tasks I've already completed from the active lists (as the web app does).

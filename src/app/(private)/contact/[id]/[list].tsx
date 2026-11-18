@@ -52,6 +52,7 @@ export default function ColleagueTaskListScreen() {
   return (
     <>
       <TaskListView
+        cacheKey={`contact:${id}:${kind}`}
         title={taskListTitle(kind, isMe ? 'Me' : (colleague?.name ?? 'Colleague'))}
         fallbackHref={`/contact/${id}` as Href}
         taskHrefBase="/contact/task"

@@ -77,14 +77,20 @@ export function useGroupManagement({
   const groupId = group?._id;
   const isAdmin = !!group && group.members.find((m) => m._id === me)?.role === 'admin';
 
+  /**
+   * Runs a change and resolves true on success. The group reloads in the background afterwards,
+   * so a sheet that called this can close straight away instead of waiting for the refetch.
+   */
   const run = async (work: () => Promise<void>, success: string, failure: string) => {
     setBusy(true);
     try {
       await work();
       toast.success(success);
-      await reload();
+      reload();
+      return true;
     } catch (e) {
       toastError(e, failure);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -207,7 +213,8 @@ type SettingsProps = {
   visible: boolean;
   group: GroupDetail;
   onClose: () => void;
-  onSave: (data: { groupName: string; description: string; status: 'active' | 'archived' }) => Promise<void>;
+  /** Resolves true when saved; the sheet stays open on failure so it can be retried. */
+  onSave: (data: { groupName: string; description: string; status: 'active' | 'archived' }) => Promise<boolean>;
 };
 
 /** Web group-settings dialog: name, description and "Admin Only Message" (status archived when on). */
@@ -224,9 +231,9 @@ function SettingsContent({ visible, group, onClose, onSave }: SettingsProps) {
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    await onSave({ groupName: name.trim(), description: description.trim(), status: adminOnly ? 'archived' : 'active' });
+    const ok = await onSave({ groupName: name.trim(), description: description.trim(), status: adminOnly ? 'archived' : 'active' });
     setSaving(false);
-    onClose();
+    if (ok) onClose();
   };
 
   return (
@@ -275,7 +282,8 @@ function SettingsContent({ visible, group, onClose, onSave }: SettingsProps) {
 /* Add members                                                         */
 /* ------------------------------------------------------------------ */
 
-type AddProps = { visible: boolean; people: Colleague[]; onClose: () => void; onAdd: (ids: string[]) => Promise<void> };
+/** onAdd resolves true when added; the sheet stays open on failure so it can be retried. */
+type AddProps = { visible: boolean; people: Colleague[]; onClose: () => void; onAdd: (ids: string[]) => Promise<boolean> };
 
 function AddMembersSheet(props: AddProps) {
   return props.visible ? <AddMembersContent {...props} /> : null;
@@ -291,9 +299,9 @@ function AddMembersContent({ visible, people, onClose, onAdd }: AddProps) {
   const add = async () => {
     if (!picked.length) return;
     setSaving(true);
-    await onAdd(picked);
+    const ok = await onAdd(picked);
     setSaving(false);
-    onClose();
+    if (ok) onClose();
   };
 
   return (

@@ -26,6 +26,7 @@ export default function DashboardTaskListScreen() {
 
   return (
     <TaskListView
+      cacheKey={`dashboard:${category}`}
       title={DASHBOARD_TITLES[category]}
       fallbackHref="/home"
       taskHrefBase="/home/task"

@@ -9,8 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { type NavItem, sidebarItemsFor } from '@/constants/navigation';
 import { type TintName, Tints } from '@/constants/theme';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useAppDispatch, useAppSelector } from '@/hooks/use-redux';
 import { formatDisplayDate, ukNow } from '@/lib/date';
 import { countDashboardTasks, type DashboardCategory } from '@/lib/tasks';
+import { type DashboardCount, setDashboardCounts } from '@/redux/features/tasksSlice';
 
 type TaskStat = {
   key: DashboardCategory;
@@ -62,16 +64,16 @@ const TASK_STATS: TaskStat[] = [
 /** Only the categories shown on this screen are counted. */
 const COUNTED: DashboardCategory[] = [TODAY.key, ...TASK_STATS.map((s) => s.key)];
 
-type Count = { count: number; capped: boolean };
-type Counts = Partial<Record<DashboardCategory, Count>>;
+type Count = DashboardCount;
 
 /**
  * Live task counts per card (same endpoints as the web CompanyDashboard), refreshed whenever Home gains focus.
- * All counts are applied together once every request has settled, so the numbers appear at the same time.
- * On a refresh the previous numbers stay visible until the new set is ready.
+ * Counts are cached in Redux, so revisiting Home shows the last numbers instantly while fresh ones load.
+ * All counts are applied together once every request has settled, so the numbers change at the same time.
  */
 function useDashboardCounts(userId?: string) {
-  const [counts, setCounts] = useState<Counts>({});
+  const dispatch = useAppDispatch();
+  const counts = useAppSelector((state) => state.tasks.counts);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,21 +81,17 @@ function useDashboardCounts(userId?: string) {
       let active = true;
       Promise.allSettled(COUNTED.map((category) => countDashboardTasks(category, userId))).then((results) => {
         if (!active) return;
-        setCounts((prev) => {
-          const next: Counts = { ...prev };
-          results.forEach((result, i) => {
-            const category = COUNTED[i];
-            if (result.status === 'fulfilled') next[category] = result.value;
-            // A failed request shows 0 rather than loading forever (keeps the last value if there was one).
-            else if (!next[category]) next[category] = { count: 0, capped: false };
-          });
-          return next;
+        const next: Partial<Record<DashboardCategory, Count | null>> = {};
+        // A failed request is sent as null: the reducer keeps the last value, or shows 0 rather than loading forever.
+        results.forEach((result, i) => {
+          next[COUNTED[i]] = result.status === 'fulfilled' ? result.value : null;
         });
+        dispatch(setDashboardCounts(next));
       });
       return () => {
         active = false;
       };
-    }, [userId])
+    }, [userId, dispatch])
   );
 
   return counts;
